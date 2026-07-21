@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>大狗叫设置</title>
+    <link rel="stylesheet" href="./settings.css" />
+  </head>
+  <body>
+    <main class="settings-shell">
+      <header class="settings-header">
+        <h1>大狗叫设置</h1>
+        <span id="save-state" class="save-state" aria-live="polite">已保存</span>
+      </header>
+
+      <section class="settings-section">
+        <h2>声音模式</h2>
+        <div class="segmented" role="radiogroup" aria-label="声音模式">
+          <label>
+            <input type="radio" name="sound-mode" value="alternate" />
+            <span>大 / 狗交替</span>
+          </label>
+          <label>
+            <input type="radio" name="sound-mode" value="da-gou" />
+            <span>按下大，松开狗</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>桌宠</h2>
+        <div class="setting-rows">
+          <label class="setting-row" for="pet-scale">
+            <span>大小</span>
+            <span id="pet-scale-value" class="value"></span>
+            <input id="pet-scale" type="range" min="65" max="160" step="1" />
+          </label>
+          <label class="setting-row" for="reaction-intensity">
+            <span>反应强度</span>
+            <span id="reaction-intensity-value" class="value"></span>
+            <input
+              id="reaction-intensity"
+              type="range"
+              min="50"
+              max="200"
+              step="5"
+            />
+          </label>
+          <div class="toggle-grid">
+            <label class="toggle-row" for="flip-horizontal">
+              <span>左右镜像</span>
+              <input id="flip-horizontal" type="checkbox" />
+              <span class="toggle" aria-hidden="true"></span>
+            </label>
+            <label class="toggle-row" for="flip-vertical">
+              <span>上下镜像</span>
+              <input id="flip-vertical" type="checkbox" />
+              <span class="toggle" aria-hidden="true"></span>
+            </label>
+            <label class="toggle-row" for="always-on-top">
+              <span>强制置顶</span>
+              <input id="always-on-top" type="checkbox" />
+              <span class="toggle" aria-hidden="true"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>声音</h2>
+        <div class="setting-rows">
+          <label class="setting-row" for="volume">
+            <span>音量</span>
+            <span id="volume-value" class="value"></span>
+            <input id="volume" type="range" min="0" max="100" step="1" />
+          </label>
+          <label class="toggle-row" for="melody-enabled">
+            <span>键区旋律</span>
+            <input id="melody-enabled" type="checkbox" />
+            <span class="toggle" aria-hidden="true"></span>
+          </label>
+          <label class="setting-row" for="jiao-pitch">
+            <span>叫的延音音高</span>
+            <span id="jiao-pitch-value" class="value"></span>
+            <input id="jiao-pitch" type="range" min="-7" max="7" step="1" />
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-section settings-section-last">
+        <div class="section-heading">
+          <h2>叫键</h2>
+          <span id="key-count" class="key-count"></span>
+        </div>
+        <div id="jiao-keys" class="key-list"></div>
+        <div class="key-actions">
+          <button id="capture-key" class="primary-button" type="button">添加按键</button>
+          <button id="restore-keys" class="secondary-button" type="button">恢复默认</button>
+        </div>
+        <p id="capture-state" class="capture-state" aria-live="polite"></p>
+      </section>
+    </main>
+    <script type="module" src="./settings.ts"></script>
+  </body>
+</html>

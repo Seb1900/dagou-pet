@@ -1,0 +1,274 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  -webkit-app-region: drag;
+  cursor: grab;
+}
+
+.stage:active {
+  cursor: grabbing;
+}
+
+.dog {
+  position: relative;
+  width: 91%;
+  height: 91%;
+  display: grid;
+  place-items: center;
+  transform-origin: 50% 72%;
+  will-change: transform, filter, opacity;
+  pointer-events: auto;
+}
+
+.dog-mirror {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform: scale(1, 1);
+  transition: transform 180ms ease-out;
+}
+
+.dog.is-flipped-horizontal .dog-mirror {
+  transform: scale(-1, 1);
+}
+
+.dog.is-flipped-vertical .dog-mirror {
+  transform: scale(1, -1);
+}
+
+.dog.is-flipped-horizontal.is-flipped-vertical .dog-mirror {
+  transform: scale(-1, -1);
+}
+
+.dog-jelly {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 72%;
+  will-change: transform;
+}
+
+.dog-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 13px 13px rgb(21 18 12 / 24%));
+}
+
+.dog-image-state {
+  opacity: 0;
+}
+
+.dog-shy-group {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 520ms ease-in-out;
+  pointer-events: none;
+}
+
+.dog-shy-tail {
+  z-index: 0;
+  transform-origin: 61.523% 26.758%;
+  filter: none;
+  will-change: transform;
+}
+
+#dog-shy {
+  z-index: 1;
+}
+
+#dog-idle {
+  transition: opacity 520ms ease-in-out;
+}
+
+.dog.is-shy .dog-shy-group {
+  opacity: 1;
+}
+
+.dog.is-bark01 #dog-bark01,
+.dog.is-bark02 #dog-bark02 {
+  opacity: 1;
+}
+
+.dog.is-shy #dog-idle,
+.dog.is-bark01 #dog-idle,
+.dog.is-bark02 #dog-idle,
+.dog.is-bark01 .dog-shy-group,
+.dog.is-bark02 .dog-shy-group {
+  opacity: 0;
+}
+
+.dog.is-scale-hover .dog-image,
+.dog.is-scale-hover .dog-shy-group {
+  opacity: 0;
+}
+
+.dog.is-scale-hover #dog-idle,
+.dog.is-scale-hover .dog-shy-group {
+  transition-duration: 0ms;
+}
+
+.dog.is-scale-hover #dog-idle-scale {
+  opacity: 1;
+}
+
+.dog-jiao-tint {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background: #ef1018;
+  mask-image: var(--jiao-idle-mask);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-mask-image: var(--jiao-idle-mask);
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.dog.is-shy .dog-jiao-tint {
+  mask-image: var(--jiao-shy-mask);
+  -webkit-mask-image: var(--jiao-shy-mask);
+}
+
+.dog.is-bark01 .dog-jiao-tint {
+  mask-image: var(--jiao-bark01-mask);
+  -webkit-mask-image: var(--jiao-bark01-mask);
+}
+
+.dog.is-bark02 .dog-jiao-tint {
+  mask-image: var(--jiao-bark02-mask);
+  -webkit-mask-image: var(--jiao-bark02-mask);
+}
+
+.dog.is-jiao .dog-jiao-tint {
+  opacity: 0.14;
+  transition-duration: 320ms;
+  transition-timing-function: ease-in-out;
+}
+
+.dog.is-scale-hover .dog-jiao-tint {
+  mask-image: var(--jiao-scale-mask);
+  opacity: 0;
+  transition-duration: 0ms;
+  -webkit-mask-image: var(--jiao-scale-mask);
+}
+
+.dog-hitbox {
+  position: absolute;
+  z-index: 3;
+  left: 12.695%;
+  bottom: 0.977%;
+  width: 73.242%;
+  height: 88.867%;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.scale-handle {
+  position: absolute;
+  z-index: 4;
+  left: 68.359%;
+  bottom: 0.977%;
+  width: 15.625%;
+  height: 15.625%;
+  cursor: nwse-resize;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.dog.is-tail-wagging .dog-shy-tail {
+  animation: shy-tail-wag 1.05s cubic-bezier(0.3, 0.7, 0.25, 1) both;
+}
+
+.dog.is-tail-wagging .dog-shy-group {
+  opacity: 1;
+  transition: none;
+}
+
+@keyframes shy-tail-wag {
+  0% { transform: rotate(0deg); }
+  12% { transform: rotate(24deg); }
+  25% { transform: rotate(-21deg); }
+  39% { transform: rotate(19deg); }
+  53% { transform: rotate(-15deg); }
+  67% { transform: rotate(11deg); }
+  82% { transform: rotate(-6deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.dog.is-flipped-horizontal:not(.is-flipped-vertical) .scale-handle,
+.dog.is-flipped-vertical:not(.is-flipped-horizontal) .scale-handle {
+  cursor: nesw-resize;
+}
+
+.stage.is-paused .dog {
+  opacity: 0.62;
+  filter: grayscale(0.8);
+}
+
+.stage.is-muted .dog {
+  filter: saturate(0.62);
+}
+
+.state-indicator {
+  position: absolute;
+  right: 11%;
+  bottom: 10%;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgb(255 255 255 / 92%);
+  border-radius: 50%;
+  background: #ffb400;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 26%);
+  opacity: 0;
+  transition: opacity 160ms ease, background-color 160ms ease;
+  pointer-events: none;
+}
+
+.stage.is-paused .state-indicator,
+.stage.is-muted .state-indicator,
+.stage.is-click-through .state-indicator {
+  opacity: 1;
+}
+
+.stage.is-paused .state-indicator {
+  background: #ef5350;
+}
+
+.stage.is-click-through:not(.is-paused) .state-indicator {
+  background: #39a8ff;
+}

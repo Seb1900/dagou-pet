@@ -1,0 +1,40 @@
+appId: com.dagou.desktoppet
+productName: Dagou Desktop Pet
+asar: true
+npmRebuild: false
+nodeGypRebuild: false
+asarUnpack:
+  - node_modules/uiohook-napi/prebuilds/**/*.node
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+  - node_modules/uiohook-napi/**/*
+  - node_modules/node-gyp-build/**/*
+extraResources:
+  - from: assets/dagou/sounds
+    to: assets/dagou/sounds
+  - from: assets/branding
+    to: assets/branding
+    filter:
+      - tray-icon.png
+win:
+  icon: assets/branding/app-icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+directories:
+  output: release
+nsis:
+  artifactName: Dagou-Desktop-Pet-Setup-${version}-${arch}.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Dagou Desktop Pet
+portable:
+  artifactName: Dagou-Desktop-Pet-Portable-${version}-${arch}.${ext}
