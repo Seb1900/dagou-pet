@@ -1,4 +1,6 @@
 :root {
+  --dog-state-fade: 180ms ease-in-out;
+
   color-scheme: light;
   font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
   background: transparent;
@@ -25,12 +27,7 @@ body {
   display: grid;
   place-items: center;
   overflow: visible;
-  -webkit-app-region: drag;
-  cursor: grab;
-}
-
-.stage:active {
-  cursor: grabbing;
+  pointer-events: none;
 }
 
 .dog {
@@ -41,7 +38,7 @@ body {
   place-items: center;
   transform-origin: 50% 72%;
   will-change: transform, filter, opacity;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .dog-mirror {
@@ -69,7 +66,8 @@ body {
   width: 100%;
   height: 100%;
   transform-origin: 50% 72%;
-  will-change: transform;
+  filter: drop-shadow(0 13px 13px rgb(21 18 12 / 24%));
+  will-change: transform, filter;
 }
 
 .dog-image {
@@ -79,7 +77,6 @@ body {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-  filter: drop-shadow(0 13px 13px rgb(21 18 12 / 24%));
 }
 
 .dog-image-state {
@@ -90,8 +87,22 @@ body {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity 520ms ease-in-out;
   pointer-events: none;
+}
+
+.dog-visual-layer {
+  z-index: 0;
+  opacity: 0;
+  transition: none;
+  will-change: opacity;
+}
+
+.dog-visual-layer.is-dog-state-base {
+  opacity: 1;
+}
+
+.dog-visual-layer.is-dog-state-transitioning {
+  transition: opacity var(--dog-state-fade);
 }
 
 .dog-shy-tail {
@@ -106,38 +117,7 @@ body {
 }
 
 #dog-idle {
-  transition: opacity 520ms ease-in-out;
-}
-
-.dog.is-shy .dog-shy-group {
-  opacity: 1;
-}
-
-.dog.is-bark01 #dog-bark01,
-.dog.is-bark02 #dog-bark02 {
-  opacity: 1;
-}
-
-.dog.is-shy #dog-idle,
-.dog.is-bark01 #dog-idle,
-.dog.is-bark02 #dog-idle,
-.dog.is-bark01 .dog-shy-group,
-.dog.is-bark02 .dog-shy-group {
-  opacity: 0;
-}
-
-.dog.is-scale-hover .dog-image,
-.dog.is-scale-hover .dog-shy-group {
-  opacity: 0;
-}
-
-.dog.is-scale-hover #dog-idle,
-.dog.is-scale-hover .dog-shy-group {
-  transition-duration: 0ms;
-}
-
-.dog.is-scale-hover #dog-idle-scale {
-  opacity: 1;
+  will-change: opacity;
 }
 
 .dog-jiao-tint {
@@ -193,9 +173,13 @@ body {
   bottom: 0.977%;
   width: 73.242%;
   height: 88.867%;
-  cursor: pointer;
+  cursor: grab;
   pointer-events: auto;
   -webkit-app-region: no-drag;
+}
+
+.stage.is-dragging .dog-hitbox {
+  cursor: grabbing;
 }
 
 .scale-handle {
@@ -212,11 +196,6 @@ body {
 
 .dog.is-tail-wagging .dog-shy-tail {
   animation: shy-tail-wag 1.05s cubic-bezier(0.3, 0.7, 0.25, 1) both;
-}
-
-.dog.is-tail-wagging .dog-shy-group {
-  opacity: 1;
-  transition: none;
 }
 
 @keyframes shy-tail-wag {

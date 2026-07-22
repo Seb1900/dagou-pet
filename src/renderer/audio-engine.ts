@@ -97,6 +97,38 @@ export class AudioEngine {
     this.post({ type: "one-shot", pressId: this.oneShotId--, spec });
   }
 
+  currentTime(): number {
+    return this.context?.currentTime ?? performance.now() / 1000;
+  }
+
+  scheduleVoices(
+    groupId: string,
+    specs: readonly VoiceSpec[],
+    startTime: number,
+    held = false
+  ): void {
+    if (!this.context || !this.worklet || specs.length === 0) return;
+    this.resume();
+    const voices = specs.map((spec) => ({
+      pressId: this.oneShotId--,
+      spec
+    }));
+    this.post({
+      type: "schedule-voices",
+      groupId,
+      startFrame: Math.max(0, Math.round(startTime * this.context.sampleRate)),
+      held,
+      voices
+    });
+  }
+
+  releaseGroup(
+    groupId: string,
+    release: "tail" | "fade" = "tail"
+  ): void {
+    this.post({ type: "release-group", groupId, release });
+  }
+
   setJiaoSustainPitch(semitones: number): void {
     this.post({ type: "jiao-pitch", semitones });
   }

@@ -185,7 +185,11 @@ const keyCodeAliases = new Map<number, number>([
   [0xee49, 0x0049],
   [0xee52, 0x0052]
 ]);
-const PENTATONIC_STEPS = [-5, -3, 0, 2, 4] as const;
+// Instant mode keeps the original playback-rate response, but exposes eight
+// restrained pitch positions instead of collapsing the keyboard into five.
+export const MELODY_PITCH_STEPS = Object.freeze([
+  -5, -4, -3, -1, 0, 2, 3, 4
+] as const);
 
 function zoneWidth(zone: PhysicalKeyDefinition["zone"]): number {
   if (zone === "main") return 15;
@@ -224,12 +228,12 @@ export function resolveKeyExpression(
     : 0.5;
   const gradient = 0.85 * xNormalized + 0.15 * yNormalized;
   const index = Math.min(
-    PENTATONIC_STEPS.length - 1,
-    Math.max(0, Math.round(gradient * (PENTATONIC_STEPS.length - 1)))
+    MELODY_PITCH_STEPS.length - 1,
+    Math.max(0, Math.round(gradient * (MELODY_PITCH_STEPS.length - 1)))
   );
   return {
     role: jiaoKeyCodes.includes(keyCode) ? "jiao" : "normal",
-    pitchStep: melodyEnabled ? PENTATONIC_STEPS[index] : 0,
+    pitchStep: melodyEnabled ? MELODY_PITCH_STEPS[index] : 0,
     pan: (xNormalized * 2 - 1) * 0.22
   };
 }

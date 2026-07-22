@@ -1,9 +1,12 @@
 import {
+  GROOVE_BPM_MAX,
+  GROOVE_BPM_MIN,
   PET_SCALE_MAX,
   PET_SCALE_MIN,
   REACTION_INTENSITY_MAX,
   REACTION_INTENSITY_MIN,
   type AppSettings,
+  type PlaybackMode,
   type SoundMode
 } from "../shared/settings";
 import {
@@ -21,6 +24,13 @@ function requireElement<T extends Element>(selector: string): T {
 const modeInputs = [...document.querySelectorAll<HTMLInputElement>(
   'input[name="sound-mode"]'
 )];
+const playbackModeInputs = [...document.querySelectorAll<HTMLInputElement>(
+  'input[name="playback-mode"]'
+)];
+const grooveTempoRow = requireElement<HTMLElement>("#groove-tempo-row");
+const grooveBpm = requireElement<HTMLInputElement>("#groove-bpm");
+const grooveBpmValue = requireElement<HTMLElement>("#groove-bpm-value");
+const jiaoPitchRow = requireElement<HTMLElement>("#jiao-pitch-row");
 const volume = requireElement<HTMLInputElement>("#volume");
 const volumeValue = requireElement<HTMLElement>("#volume-value");
 const petScale = requireElement<HTMLInputElement>("#pet-scale");
@@ -50,9 +60,18 @@ petScale.min = String(PET_SCALE_MIN * 100);
 petScale.max = String(PET_SCALE_MAX * 100);
 reactionIntensity.min = String(REACTION_INTENSITY_MIN * 100);
 reactionIntensity.max = String(REACTION_INTENSITY_MAX * 100);
+grooveBpm.min = String(GROOVE_BPM_MIN);
+grooveBpm.max = String(GROOVE_BPM_MAX);
 
 function render(): void {
   if (!settings) return;
+  for (const input of playbackModeInputs) {
+    input.checked = input.value === settings.playbackMode;
+  }
+  grooveBpm.value = String(settings.grooveBpm);
+  grooveBpmValue.textContent = `${settings.grooveBpm} BPM`;
+  grooveTempoRow.hidden = settings.playbackMode !== "groove";
+  jiaoPitchRow.hidden = settings.playbackMode !== "instant";
   for (const input of modeInputs) input.checked = input.value === settings.soundMode;
   volume.value = String(Math.round(settings.volume * 100));
   volumeValue.textContent = `${volume.value}%`;
@@ -128,6 +147,21 @@ function setCapturing(value: boolean): void {
   captureKey.textContent = value ? "取消录入" : "添加按键";
   captureState.textContent = value ? "等待按键..." : "";
 }
+
+for (const input of playbackModeInputs) {
+  input.addEventListener("change", () => {
+    if (input.checked) {
+      void persist({ playbackMode: input.value as PlaybackMode });
+    }
+  });
+}
+
+grooveBpm.addEventListener("input", () => {
+  grooveBpmValue.textContent = `${grooveBpm.value} BPM`;
+});
+grooveBpm.addEventListener("change", () => {
+  void persist({ grooveBpm: Number(grooveBpm.value) });
+});
 
 for (const input of modeInputs) {
   input.addEventListener("change", () => {

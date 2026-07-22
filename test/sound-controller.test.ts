@@ -26,11 +26,19 @@ function setup(mode: "alternate" | "da-gou" = "alternate") {
     noteOn: vi.fn(),
     noteOff: vi.fn(),
     playOneShot: vi.fn(),
+    currentTime: vi.fn(() => 10),
+    scheduleVoices: vi.fn(),
+    releaseGroup: vi.fn(),
     setJiaoSustainPitch: vi.fn(),
     stopAll: vi.fn()
   };
   const controller = new SoundController(output);
-  controller.configure({ soundMode: mode, jiaoSustainPitch: 0 });
+  controller.configure({
+    soundMode: mode,
+    jiaoSustainPitch: 0,
+    playbackMode: "instant",
+    grooveBpm: 128
+  });
   return { controller, output };
 }
 
@@ -88,9 +96,64 @@ describe("SoundController", () => {
   it("clears held voices and alternation when mode changes or input resets", () => {
     const { controller, output } = setup();
     controller.handle(input(1, "down"));
-    controller.configure({ soundMode: "da-gou", jiaoSustainPitch: 2 });
+    controller.configure({
+      soundMode: "da-gou",
+      jiaoSustainPitch: 2,
+      playbackMode: "instant",
+      grooveBpm: 128
+    });
     controller.handle({ type: "reset", heldCount: 0, timestamp: 2 });
     expect(output.stopAll).toHaveBeenCalledTimes(2);
     expect(output.setJiaoSustainPitch).toHaveBeenLastCalledWith(2);
+  });
+
+  it("switches to quantized playback without changing instant behavior", () => {
+    const { controller, output } = setup();
+    controller.configure({
+      soundMode: "alternate",
+      jiaoSustainPitch: 0,
+      playbackMode: "groove",
+      grooveBpm: 128
+    });
+    controller.handle(input(9, "down"));
+
+    expect(output.stopAll).toHaveBeenCalledTimes(1);
+    expect(output.noteOn).not.toHaveBeenCalled();
+    expect(output.scheduleVoices).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      10.012,
+      true
+    );
+  });
+
+  it("releases a quantized held group into its tail on key-up", () => {
+    const { controller, output } = setup();
+    controller.configure({
+      soundMode: "alternate",
+      jiaoSustainPitch: 0,
+      playbackMode: "groove",
+      grooveBpm: 128
+    });
+    controller.handle(input(15, "down"));
+    const groupId = vi.mocked(output.scheduleVoices).mock.calls[0][0];
+    controller.handle(input(15, "up"));
+
+    expect(output.releaseGroup).toHaveBeenCalledWith(groupId, "tail");
+  });
+
+  it("does not interrupt instant playback when only groove tempo changes", () => {
+    const { controller, output } = setup();
+    controller.handle(input(12, "down"));
+    controller.configure({
+      soundMode: "alternate",
+      jiaoSustainPitch: 0,
+      playbackMode: "instant",
+      grooveBpm: 144
+    });
+    controller.handle(input(12, "up"));
+
+    expect(output.stopAll).not.toHaveBeenCalled();
+    expect(output.noteOff).toHaveBeenCalledWith(12, "tail");
   });
 });

@@ -51,6 +51,7 @@ class FakeAudioWorkletNode extends FakeAudioNode {
 class FakeAudioContext {
   static latest: FakeAudioContext | null = null;
   readonly currentTime = 10;
+  readonly sampleRate = 48_000;
   readonly state = "running";
   readonly destination = new FakeAudioNode();
   readonly gains: FakeGainNode[] = [];
@@ -159,6 +160,68 @@ describe("AudioEngine", () => {
         release: "tail",
         followUp: { pressId: -1, spec: gou }
       }
+    ]);
+    engine.dispose();
+  });
+
+  it("schedules voice groups at absolute audio frames", async () => {
+    const { context, worklet, engine } = await setup();
+    const da = {
+      sample: "da" as const,
+      role: "normal" as const,
+      pitchSemitones: -2,
+      gain: 0.7,
+      pan: -0.1
+    };
+    const gou = {
+      ...da,
+      sample: "gou" as const,
+      pitchSemitones: 3,
+      pan: 0.1
+    };
+    const startTime = context.currentTime + 0.234_375;
+
+    expect(engine.currentTime()).toBe(context.currentTime);
+    engine.scheduleVoices("step-12", [da, gou], startTime);
+
+    expect(worklet.port.messages.at(-1)).toEqual({
+      type: "schedule-voices",
+      groupId: "step-12",
+      startFrame: Math.round(startTime * context.sampleRate),
+      held: false,
+      voices: [
+        { pressId: -1, spec: da },
+        { pressId: -2, spec: gou }
+      ]
+    });
+    engine.dispose();
+  });
+
+  it("schedules held groups and sends group release commands", async () => {
+    const { context, worklet, engine } = await setup();
+    const spec = {
+      sample: "jiao" as const,
+      role: "jiao" as const,
+      pitchSemitones: 0,
+      gain: 0.6,
+      pan: 0
+    };
+    const startTime = context.currentTime + 0.125;
+
+    engine.scheduleVoices("held-step", [spec], startTime, true);
+    engine.releaseGroup("held-step");
+    engine.releaseGroup("forced-step", "fade");
+
+    expect(worklet.port.messages.slice(-3)).toEqual([
+      {
+        type: "schedule-voices",
+        groupId: "held-step",
+        startFrame: Math.round(startTime * context.sampleRate),
+        held: true,
+        voices: [{ pressId: -1, spec }]
+      },
+      { type: "release-group", groupId: "held-step", release: "tail" },
+      { type: "release-group", groupId: "forced-step", release: "fade" }
     ]);
     engine.dispose();
   });

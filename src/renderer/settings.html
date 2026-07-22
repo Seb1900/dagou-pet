@@ -18,6 +18,25 @@
       </header>
 
       <section class="settings-section">
+        <h2>演奏方式</h2>
+        <div class="segmented" role="radiogroup" aria-label="演奏方式">
+          <label>
+            <input type="radio" name="playback-mode" value="groove" />
+            <span>节奏乐谱</span>
+          </label>
+          <label>
+            <input type="radio" name="playback-mode" value="instant" />
+            <span>即时反馈</span>
+          </label>
+        </div>
+        <label id="groove-tempo-row" class="setting-row mode-detail" for="groove-bpm">
+          <span>速度</span>
+          <span id="groove-bpm-value" class="value"></span>
+          <input id="groove-bpm" type="range" min="96" max="168" step="4" />
+        </label>
+      </section>
+
+      <section class="settings-section">
         <h2>声音模式</h2>
         <div class="segmented" role="radiogroup" aria-label="声音模式">
           <label>
@@ -83,7 +102,7 @@
             <input id="melody-enabled" type="checkbox" />
             <span class="toggle" aria-hidden="true"></span>
           </label>
-          <label class="setting-row" for="jiao-pitch">
+          <label id="jiao-pitch-row" class="setting-row" for="jiao-pitch">
             <span>叫的延音音高</span>
             <span id="jiao-pitch-value" class="value"></span>
             <input id="jiao-pitch" type="range" min="-7" max="7" step="1" />

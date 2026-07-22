@@ -1,7 +1,6 @@
-const MAX_VOICES = 12;
+const MAX_VOICES = 36;
 const INITIAL_FADE_SECONDS = 0.004;
 const FORCED_FADE_SECONDS = 0.018;
-const SUSTAIN_RELEASE_FADE_SECONDS = 0.2;
 const RATE_SMOOTH_SECONDS = 0.035;
 const JIAO_VIBRATO_HZ = 1.2;
 const JIAO_VIBRATO_SEMITONES = 0.14;
@@ -20,8 +19,10 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
     this.samples = new Map();
     this.profiles = new Map();
     this.voices = new Map();
+    this.pendingGroups = new Map();
     this.voiceAge = 0;
     this.jiaoSustainPitch = 0;
+    this.frameCursor = typeof currentFrame === "number" ? currentFrame : 0;
     this.port.onmessage = (event) => this.handleMessage(event.data);
   }
 
@@ -45,30 +46,57 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
       case "one-shot":
         this.startVoice(message.pressId, message.spec, false);
         break;
+      case "schedule-voices":
+        if ([...this.voices.values()].some(
+          (voice) => voice.groupId === message.groupId
+        )) break;
+        this.pendingGroups.set(message.groupId, {
+          startFrame: Math.max(
+            this.frameCursor,
+            Number(message.startFrame) || 0
+          ),
+          voices: message.voices,
+          held: message.held === true
+        });
+        break;
       case "note-off":
         this.releaseVoice(message.pressId, message.release, message.followUp);
+        break;
+      case "release-group":
+        this.releaseGroup(message.groupId, message.release);
         break;
       case "jiao-pitch":
         this.jiaoSustainPitch = clamp(Number(message.semitones) || 0, -7, 7);
         for (const voice of this.voices.values()) {
-          if (voice.spec.sample === "jiao" && voice.state === "sustain") {
+          if (
+            voice.spec.sample === "jiao" &&
+            voice.state === "sustain" &&
+            !voice.releasePending
+          ) {
             voice.targetRate = voice.baseRate * pitchRate(this.jiaoSustainPitch);
           }
         }
         break;
       case "stop-all":
         this.voices.clear();
+        this.pendingGroups.clear();
         break;
     }
   }
 
-  startVoice(pressId, spec, held) {
+  startVoice(
+    pressId,
+    spec,
+    held,
+    startFrame = this.frameCursor,
+    groupId = null
+  ) {
     const samples = this.samples.get(spec.sample);
     const profile = this.profiles.get(spec.sample);
     if (!samples || !profile) return;
     this.reclaimVoice(spec.role);
     const baseRate = pitchRate(spec.pitchSemitones);
-    this.voices.set(pressId, {
+    const voice = {
       id: pressId,
       spec,
       samples,
@@ -85,9 +113,15 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
       forcedFadeRemaining: 0,
       forcedFadeTotal: 0,
       followUp: null,
+      releasePending: false,
+      hasSustained: false,
       sustainRendered: 0,
-      phaseSeed: (this.voiceAge * 1.61803398875) % 1
-    });
+      phaseSeed: (this.voiceAge * 1.61803398875) % 1,
+      startFrame: Math.max(this.frameCursor, Number(startFrame) || 0),
+      groupId
+    };
+    this.voices.set(pressId, voice);
+    return voice;
   }
 
   releaseVoice(pressId, release, followUp) {
@@ -101,7 +135,23 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
       return;
     }
     if (voice.state === "sustain") {
-      this.startFade(voice, SUSTAIN_RELEASE_FADE_SECONDS);
+      voice.releasePending = true;
+      if (voice.spec.sample === "jiao") {
+        voice.targetRate = voice.currentRate;
+      }
+    }
+  }
+
+  releaseGroup(groupId, release = "tail") {
+    const pending = this.pendingGroups.get(groupId);
+    if (pending) {
+      pending.held = false;
+      return;
+    }
+    for (const voice of this.voices.values()) {
+      if (voice.groupId === groupId) {
+        this.releaseVoice(voice.id, release);
+      }
     }
   }
 
@@ -118,7 +168,14 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
       voices.find((voice) => voice.spec.role === "normal") ||
       (incomingRole === "jiao" ? voices[0] : voices.find((voice) => voice.spec.role !== "jiao")) ||
       voices[0];
-    if (candidate) this.voices.delete(candidate.id);
+    if (!candidate) return;
+    if (candidate.groupId !== null) {
+      for (const [id, voice] of this.voices) {
+        if (voice.groupId === candidate.groupId) this.voices.delete(id);
+      }
+      return;
+    }
+    this.voices.delete(candidate.id);
   }
 
   read(samples, position) {
@@ -131,6 +188,12 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
   renderLoop(voice) {
     const { loopStart, loopEnd, crossfade } = voice.profile;
     const crossfadeStart = loopEnd - crossfade;
+    if (voice.releasePending && voice.position < crossfadeStart) {
+      voice.state = "tail";
+      const value = this.read(voice.samples, voice.position);
+      voice.position += voice.currentRate;
+      return value;
+    }
     let value;
     if (voice.position >= crossfadeStart) {
       const progress = clamp((voice.position - crossfadeStart) / crossfade, 0, 1);
@@ -144,11 +207,13 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
     voice.position += voice.currentRate;
     if (voice.position >= loopEnd) {
       voice.position = loopStart + crossfade + (voice.position - loopEnd);
+      if (voice.releasePending) voice.state = "tail";
     }
     return value;
   }
 
-  renderVoice(voice) {
+  renderVoice(voice, frame) {
+    if (frame < voice.startFrame) return 0;
     const smoothing = 1 - Math.exp(-1 / (sampleRate * RATE_SMOOTH_SECONDS));
     voice.currentRate += (voice.targetRate - voice.currentRate) * smoothing;
 
@@ -157,26 +222,33 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
       value = this.read(voice.samples, voice.position);
       voice.position += voice.currentRate;
       if (voice.position >= voice.samples.length - 1) return null;
-      if (voice.held && !voice.released && voice.position >= voice.profile.loopEnd) {
+      const crossfadeStart = voice.profile.loopEnd - voice.profile.crossfade;
+      if (voice.held && !voice.released && voice.position >= crossfadeStart) {
         voice.state = "sustain";
-        voice.position = voice.profile.loopStart + voice.profile.crossfade;
+        voice.hasSustained = true;
         if (voice.spec.sample === "jiao") {
           voice.targetRate = voice.baseRate * pitchRate(this.jiaoSustainPitch);
         }
       }
     } else if (voice.state === "sustain") {
       value = this.renderLoop(voice);
-      const sustainElapsed = voice.sustainRendered / sampleRate;
-      const vibratoSemitones = voice.spec.sample === "jiao"
-        ? Math.cos(sustainElapsed * JIAO_VIBRATO_HZ * Math.PI * 2) *
-          JIAO_VIBRATO_SEMITONES
-        : 0;
-      const sustainRate = voice.baseRate * pitchRate(
-        (voice.spec.sample === "jiao" ? this.jiaoSustainPitch : 0) +
-        vibratoSemitones
-      );
-      voice.targetRate = sustainRate;
+      if (!voice.releasePending) {
+        const sustainElapsed = voice.sustainRendered / sampleRate;
+        const vibratoSemitones = voice.spec.sample === "jiao"
+          ? Math.cos(sustainElapsed * JIAO_VIBRATO_HZ * Math.PI * 2) *
+            JIAO_VIBRATO_SEMITONES
+          : 0;
+        const sustainRate = voice.baseRate * pitchRate(
+          (voice.spec.sample === "jiao" ? this.jiaoSustainPitch : 0) +
+          vibratoSemitones
+        );
+        voice.targetRate = sustainRate;
+      }
       voice.sustainRendered += 1;
+    } else if (voice.state === "tail") {
+      value = this.read(voice.samples, voice.position);
+      voice.position += voice.currentRate;
+      if (voice.position >= voice.samples.length - 1) return null;
     }
 
     const initialFade = Math.min(
@@ -190,7 +262,7 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
       voice.forcedFadeRemaining -= 1;
       if (voice.forcedFadeRemaining <= 0) return null;
     }
-    if (voice.state === "sustain") {
+    if (voice.hasSustained) {
       const breath = Math.sin(
         (voice.rendered / sampleRate * 0.67 + voice.phaseSeed) * Math.PI * 2
       );
@@ -208,15 +280,43 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
     left.fill(0);
     if (right !== left) right.fill(0);
 
+    const blockEnd = this.frameCursor + left.length;
+    for (const [groupId, group] of this.pendingGroups) {
+      if (group.startFrame >= blockEnd) continue;
+      this.pendingGroups.delete(groupId);
+      for (const voice of group.voices) {
+        this.startVoice(
+          voice.pressId,
+          voice.spec,
+          group.held,
+          group.startFrame,
+          groupId
+        );
+      }
+    }
+
     const voices = [...this.voices.values()];
-    const mixScale = 1 / Math.sqrt(Math.max(1, voices.length * 0.82));
+    const audibleVoiceCount = voices.filter(
+      (voice) => voice.startFrame < blockEnd
+    ).length;
+    const mixScale = 1 / Math.sqrt(Math.max(1, audibleVoiceCount * 0.82));
     const finished = new Set();
     for (let frame = 0; frame < left.length; frame += 1) {
       for (const voice of voices) {
         if (finished.has(voice.id)) continue;
-        const value = this.renderVoice(voice);
+        const value = this.renderVoice(voice, this.frameCursor + frame);
         if (value === null) {
           finished.add(voice.id);
+          this.voices.delete(voice.id);
+          if (voice.followUp) {
+            const followUp = this.startVoice(
+              voice.followUp.pressId,
+              voice.followUp.spec,
+              false,
+              this.frameCursor + frame + 1
+            );
+            if (followUp) voices.push(followUp);
+          }
           continue;
         }
         const pan = clamp(voice.spec.pan, -1, 1);
@@ -225,15 +325,7 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
         right[frame] += value * Math.sin(angle) * mixScale;
       }
     }
-    const followUps = [];
-    for (const id of finished) {
-      const voice = this.voices.get(id);
-      if (voice?.followUp) followUps.push(voice.followUp);
-      this.voices.delete(id);
-    }
-    for (const followUp of followUps) {
-      this.startVoice(followUp.pressId, followUp.spec, false);
-    }
+    this.frameCursor += left.length;
     return true;
   }
 }

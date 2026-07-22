@@ -1,7 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   AudioSampleName,
-  DogInputEvent
+  DogInputEvent,
+  PetMoveRequest
 } from "../shared/contracts";
 import type { AppSettings } from "../shared/settings";
 
@@ -10,6 +11,8 @@ const IPC_CHANNELS = {
   getSettings: "dagou:get-settings",
   updateSettings: "dagou:update-settings",
   resizePet: "dagou:resize-pet",
+  movePet: "dagou:move-pet",
+  setPetMouseInteractive: "dagou:set-pet-mouse-interactive",
   input: "dagou:input",
   loadAudio: "dagou:load-audio",
   rendererFailed: "dagou:renderer-failed",
@@ -34,6 +37,14 @@ const api = {
       IPC_CHANNELS.resizePet,
       scale
     ) as Promise<AppSettings>;
+  },
+
+  movePet(request: PetMoveRequest): void {
+    ipcRenderer.send(IPC_CHANNELS.movePet, request);
+  },
+
+  setPetMouseInteractive(interactive: boolean): void {
+    ipcRenderer.send(IPC_CHANNELS.setPetMouseInteractive, interactive);
   },
 
   async loadAudio(name: AudioSampleName): Promise<ArrayBuffer> {

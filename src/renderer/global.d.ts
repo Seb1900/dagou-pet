@@ -1,6 +1,7 @@
 import type {
   AudioSampleName,
-  DogInputEvent
+  DogInputEvent,
+  PetMoveRequest
 } from "../shared/contracts";
 import type { AppSettings } from "../shared/settings";
 
@@ -10,6 +11,8 @@ declare global {
       getSettings(): Promise<AppSettings>;
       updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
       resizePet(scale: number): Promise<AppSettings>;
+      movePet(request: PetMoveRequest): void;
+      setPetMouseInteractive(interactive: boolean): void;
       loadAudio(name: AudioSampleName): Promise<ArrayBuffer>;
       notifyReady(): void;
       notifyFailed(message: string): void;

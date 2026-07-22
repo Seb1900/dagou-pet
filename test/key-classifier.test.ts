@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_JIAO_KEY_CODES,
   KEY_CODES,
+  MELODY_PITCH_STEPS,
+  PHYSICAL_KEYS,
   describeKeyCode,
   keyCodeFromDomCode,
   resolveKeyExpression
@@ -37,6 +39,19 @@ describe("physical key mapping", () => {
     expect(left.pitchStep).toBeLessThan(middle.pitchStep);
     expect(middle.pitchStep).toBeLessThan(right.pitchStep);
     expect(left.pan).toBeLessThan(right.pan);
+  });
+
+  it("exposes eight restrained pitch positions across the keyboard", () => {
+    const pitches = new Set(
+      PHYSICAL_KEYS.map((key) =>
+        resolveKeyExpression(key.keyCode, [], true).pitchStep
+      )
+    );
+
+    expect(MELODY_PITCH_STEPS).toHaveLength(8);
+    expect(pitches).toEqual(new Set(MELODY_PITCH_STEPS));
+    expect(Math.min(...MELODY_PITCH_STEPS)).toBeGreaterThanOrEqual(-5);
+    expect(Math.max(...MELODY_PITCH_STEPS)).toBeLessThanOrEqual(5);
   });
 
   it("can disable regional melody while preserving roles", () => {

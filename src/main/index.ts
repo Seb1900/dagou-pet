@@ -14,7 +14,9 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
   AudioSampleName,
-  DogInputEvent
+  DogInputEvent,
+  PetMoveRequest,
+  PetPoint
 } from "../shared/contracts";
 import { AUDIO_SAMPLE_NAMES, IPC_CHANNELS } from "../shared/contracts";
 import {
@@ -23,9 +25,12 @@ import {
 } from "../shared/settings";
 import { resolveKeyExpression } from "../shared/key-classifier";
 import {
+  constrainWindowPositionToWorkArea,
   resizeSquareFromAnchor,
+  shouldIgnorePetMouseEvents,
   type HorizontalAnchor,
-  type VerticalAnchor
+  type VerticalAnchor,
+  type WindowRectangle
 } from "../shared/window-geometry";
 import { KeyboardHook } from "./keyboard-hook";
 import { KeyboardLifecycle } from "./keyboard-lifecycle";
@@ -52,6 +57,7 @@ let rendererReady = false;
 let systemSuspended = false;
 let muteShortcutLabel: string | null = null;
 let clickThroughShortcutLabel: string | null = null;
+let petMouseInteractive = false;
 let positionSaveTimer: NodeJS.Timeout | null = null;
 let smokeFinished = false;
 let smokePetReady = false;
@@ -99,6 +105,68 @@ function brandingDirectory(): string {
 
 function audioPath(name: AudioSampleName): string {
   return join(assetDirectory(), "sounds", `${name}.wav`);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
+}
+
+function parsePetPoint(value: unknown): PetPoint | null {
+  if (
+    !isRecord(value) ||
+    typeof value.x !== "number" ||
+    !Number.isFinite(value.x) ||
+    Math.abs(value.x) > 2_147_483_647 ||
+    typeof value.y !== "number" ||
+    !Number.isFinite(value.y) ||
+    Math.abs(value.y) > 2_147_483_647
+  ) {
+    return null;
+  }
+  return { x: value.x, y: value.y };
+}
+
+function parsePetMoveRequest(value: unknown): PetMoveRequest | null {
+  if (!isRecord(value)) return null;
+  const position = parsePetPoint(value.position);
+  const pointer = parsePetPoint(value.pointer);
+  if (!position || !pointer || !isRecord(value.dragRegion)) return null;
+  const dragPosition = parsePetPoint(value.dragRegion);
+  const { width, height } = value.dragRegion;
+  if (
+    !dragPosition ||
+    typeof width !== "number" ||
+    !Number.isFinite(width) ||
+    width <= 0 ||
+    typeof height !== "number" ||
+    !Number.isFinite(height) ||
+    height <= 0
+  ) {
+    return null;
+  }
+  return {
+    position,
+    pointer,
+    dragRegion: { ...dragPosition, width, height }
+  };
+}
+
+function clipDragRegionToWindow(
+  region: WindowRectangle,
+  windowWidth: number,
+  windowHeight: number
+): WindowRectangle | null {
+  const unboundedRight = region.x + region.width;
+  const unboundedBottom = region.y + region.height;
+  if (!Number.isFinite(unboundedRight) || !Number.isFinite(unboundedBottom)) {
+    return null;
+  }
+  const x = Math.max(0, region.x);
+  const y = Math.max(0, region.y);
+  const right = Math.min(windowWidth, unboundedRight);
+  const bottom = Math.min(windowHeight, unboundedBottom);
+  if (right <= x || bottom <= y) return null;
+  return { x, y, width: right - x, height: bottom - y };
 }
 
 function petWindowSize(): number {
@@ -157,13 +225,26 @@ function reassertPetWindowOnTop(): void {
   petWindow.moveTop();
 }
 
+function applyPetMousePolicy(): void {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  petWindow.setIgnoreMouseEvents(
+    shouldIgnorePetMouseEvents(settings.clickThrough, petMouseInteractive),
+    { forward: true }
+  );
+}
+
+function resetPetMouseInteraction(): void {
+  petMouseInteractive = false;
+  applyPetMousePolicy();
+}
+
 function applyWindowSettings(
   horizontalAnchor: HorizontalAnchor = "right",
   verticalAnchor: VerticalAnchor = "bottom"
 ): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   reassertPetWindowOnTop();
-  petWindow.setIgnoreMouseEvents(settings.clickThrough, { forward: true });
+  applyPetMousePolicy();
   const size = petWindowSize();
   const bounds = petWindow.getBounds();
   if (bounds.width !== size || bounds.height !== size) {
@@ -264,6 +345,23 @@ function rebuildTrayMenu(): void {
       { label: "声音大小", submenu: volumeMenu() },
       { label: "桌宠大小", submenu: scaleMenu() },
       {
+        label: "演奏方式",
+        submenu: [
+          {
+            label: "节奏乐谱",
+            type: "radio",
+            checked: settings.playbackMode === "groove",
+            click: () => updateSettings({ playbackMode: "groove" })
+          },
+          {
+            label: "即时反馈",
+            type: "radio",
+            checked: settings.playbackMode === "instant",
+            click: () => updateSettings({ playbackMode: "instant" })
+          }
+        ]
+      },
+      {
         label: "声音模式",
         submenu: [
           {
@@ -350,6 +448,7 @@ function registerFirstAvailableShortcut(
 }
 
 function createPetWindow(): BrowserWindow {
+  petMouseInteractive = false;
   const size = petWindowSize();
   const position = savedPosition(size);
   const window = new BrowserWindow({
@@ -366,6 +465,7 @@ function createPetWindow(): BrowserWindow {
     fullscreenable: false,
     focusable: false,
     show: false,
+    icon: join(brandingDirectory(), "tray-icon.png"),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -377,7 +477,7 @@ function createPetWindow(): BrowserWindow {
   });
 
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  window.setIgnoreMouseEvents(settings.clickThrough, { forward: true });
+  window.setIgnoreMouseEvents(true, { forward: true });
   window.on("move", schedulePositionSave);
   window.on("show", reassertPetWindowOnTop);
   window.on("close", (event) => {
@@ -389,10 +489,12 @@ function createPetWindow(): BrowserWindow {
   window.webContents.on("will-navigate", (event) => event.preventDefault());
   window.webContents.on("did-start-loading", () => {
     rendererReady = false;
+    resetPetMouseInteraction();
     syncKeyboardHook();
   });
   window.webContents.on("render-process-gone", () => {
     rendererReady = false;
+    resetPetMouseInteraction();
     syncKeyboardHook();
   });
   if (isSmokeTest) {
@@ -437,6 +539,7 @@ function showSettingsWindow(): void {
     backgroundColor: "#f4f5f2",
     autoHideMenuBar: true,
     show: false,
+    icon: join(brandingDirectory(), "tray-icon.png"),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -497,6 +600,49 @@ function registerIpc(): void {
     rebuildTrayMenu();
     return settings;
   });
+  ipcMain.on(IPC_CHANNELS.movePet, (event, payload: unknown) => {
+    const window = petWindow;
+    if (
+      !window ||
+      window.isDestroyed() ||
+      event.sender !== window.webContents
+    ) {
+      return;
+    }
+    const request = parsePetMoveRequest(payload);
+    if (!request) return;
+    const contentBounds = window.getContentBounds();
+    const dragRegion = clipDragRegionToWindow(
+      request.dragRegion,
+      contentBounds.width,
+      contentBounds.height
+    );
+    if (!dragRegion) return;
+    const display = screen.getDisplayNearestPoint({
+      x: Math.round(request.pointer.x),
+      y: Math.round(request.pointer.y)
+    });
+    const position = constrainWindowPositionToWorkArea(
+      request.position,
+      dragRegion,
+      display.workArea
+    );
+    window.setPosition(position.x, position.y, false);
+  });
+  ipcMain.on(
+    IPC_CHANNELS.setPetMouseInteractive,
+    (event, interactive: unknown) => {
+      if (
+        event.sender !== petWindow?.webContents ||
+        typeof interactive !== "boolean"
+      ) {
+        return;
+      }
+      if (petMouseInteractive === interactive) return;
+      petMouseInteractive = interactive;
+      applyPetMousePolicy();
+    }
+  );
   ipcMain.on(IPC_CHANNELS.rendererReady, (event) => {
     if (event.sender === settingsWindow?.webContents) {
       if (isSmokeTest) {

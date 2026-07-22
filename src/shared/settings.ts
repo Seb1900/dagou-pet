@@ -2,6 +2,10 @@ import { DEFAULT_JIAO_KEY_CODES } from "./key-classifier";
 
 export const SOUND_MODES = ["alternate", "da-gou"] as const;
 export type SoundMode = (typeof SOUND_MODES)[number];
+export const PLAYBACK_MODES = ["groove", "instant"] as const;
+export type PlaybackMode = (typeof PLAYBACK_MODES)[number];
+export const GROOVE_BPM_MIN = 96;
+export const GROOVE_BPM_MAX = 168;
 export const PET_WINDOW_BASE_SIZE = 310;
 export const PET_SCALE_MIN = 0.65;
 export const PET_SCALE_MAX = 1.6;
@@ -20,6 +24,8 @@ export interface AppSettings {
   flipVertical: boolean;
   x: number | null;
   y: number | null;
+  playbackMode: PlaybackMode;
+  grooveBpm: number;
   soundMode: SoundMode;
   jiaoKeyCodes: readonly number[];
   melodyEnabled: boolean;
@@ -38,6 +44,8 @@ export const DEFAULT_SETTINGS: Readonly<AppSettings> = Object.freeze({
   flipVertical: false,
   x: null,
   y: null,
+  playbackMode: "groove",
+  grooveBpm: 128,
   soundMode: "alternate",
   jiaoKeyCodes: DEFAULT_JIAO_KEY_CODES,
   melodyEnabled: true,
@@ -72,6 +80,12 @@ function soundModeOr(value: unknown): SoundMode {
   return value === "da-gou" || value === "alternate"
     ? value
     : DEFAULT_SETTINGS.soundMode;
+}
+
+function playbackModeOr(value: unknown): PlaybackMode {
+  return value === "instant" || value === "groove"
+    ? value
+    : DEFAULT_SETTINGS.playbackMode;
 }
 
 function keyCodesOr(value: unknown): readonly number[] {
@@ -119,6 +133,13 @@ export function normalizeSettings(value: unknown): AppSettings {
     flipVertical: booleanOr(source.flipVertical, DEFAULT_SETTINGS.flipVertical),
     x: finiteOrNull(source.x),
     y: finiteOrNull(source.y),
+    playbackMode: playbackModeOr(source.playbackMode),
+    grooveBpm: Math.round(clampNumber(
+      source.grooveBpm,
+      DEFAULT_SETTINGS.grooveBpm,
+      GROOVE_BPM_MIN,
+      GROOVE_BPM_MAX
+    )),
     soundMode: soundModeOr(source.soundMode),
     jiaoKeyCodes: keyCodesOr(source.jiaoKeyCodes),
     melodyEnabled: booleanOr(

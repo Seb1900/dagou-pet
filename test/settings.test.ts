@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SETTINGS, normalizeSettings } from "../src/shared/settings";
+import {
+  DEFAULT_SETTINGS,
+  GROOVE_BPM_MAX,
+  GROOVE_BPM_MIN,
+  normalizeSettings
+} from "../src/shared/settings";
 
 describe("normalizeSettings", () => {
   it("falls back for invalid input", () => {
@@ -37,6 +42,29 @@ describe("normalizeSettings", () => {
     expect(settings.jiaoKeyCodes).toEqual([1, 2]);
     expect(settings.melodyEnabled).toBe(false);
     expect(settings.jiaoSustainPitch).toBe(7);
+  });
+
+  it("normalizes playback mode and rounds a clamped groove tempo", () => {
+    expect(normalizeSettings({
+      playbackMode: "instant",
+      grooveBpm: 127.6
+    })).toMatchObject({
+      playbackMode: "instant",
+      grooveBpm: 128
+    });
+    expect(normalizeSettings({ grooveBpm: -1 }).grooveBpm).toBe(
+      GROOVE_BPM_MIN
+    );
+    expect(normalizeSettings({ grooveBpm: 999 }).grooveBpm).toBe(
+      GROOVE_BPM_MAX
+    );
+    expect(normalizeSettings({
+      playbackMode: "unknown",
+      grooveBpm: Number.NaN
+    })).toMatchObject({
+      playbackMode: DEFAULT_SETTINGS.playbackMode,
+      grooveBpm: DEFAULT_SETTINGS.grooveBpm
+    });
   });
 
   it("keeps only finite positions and booleans", () => {

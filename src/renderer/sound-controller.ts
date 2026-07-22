@@ -1,5 +1,10 @@
 import type { DogInputEvent, DogKeyInputEvent } from "../shared/contracts";
-import type { AppSettings, SoundMode } from "../shared/settings";
+import type {
+  AppSettings,
+  PlaybackMode,
+  SoundMode
+} from "../shared/settings";
+import { GroovePlayer } from "./groove-player";
 import { createVoiceSpec, type VoiceSpec } from "./sound-profile";
 
 export interface SoundOutput {
@@ -10,6 +15,14 @@ export interface SoundOutput {
     followUp?: VoiceSpec
   ): void;
   playOneShot(spec: VoiceSpec): void;
+  currentTime(): number;
+  scheduleVoices(
+    groupId: string,
+    specs: readonly VoiceSpec[],
+    startTime: number,
+    held?: boolean
+  ): void;
+  releaseGroup(groupId: string, release?: "tail" | "fade"): void;
   setJiaoSustainPitch(semitones: number): void;
   stopAll(): void;
 }
@@ -22,18 +35,41 @@ interface ActiveSound {
 export class SoundController {
   private readonly active = new Map<number, ActiveSound>();
   private mode: SoundMode = "alternate";
+  private playbackMode: PlaybackMode = "groove";
+  private grooveBpm = 128;
   private nextAlternate: "da" | "gou" = "da";
   private alternateDaExpression: Pick<
     DogKeyInputEvent,
     "pitchStep" | "pan"
   > | null = null;
   private configured = false;
+  private readonly groove: GroovePlayer;
 
-  constructor(private readonly output: SoundOutput) {}
+  constructor(private readonly output: SoundOutput) {
+    this.groove = new GroovePlayer(output);
+  }
 
-  configure(settings: Pick<AppSettings, "soundMode" | "jiaoSustainPitch">): void {
-    if (this.configured && settings.soundMode !== this.mode) this.reset();
+  configure(settings: Pick<
+    AppSettings,
+    "soundMode" | "jiaoSustainPitch" | "playbackMode" | "grooveBpm"
+  >): void {
+    const playbackChanged = settings.playbackMode !== this.playbackMode;
+    const activeGrooveTempoChanged =
+      settings.grooveBpm !== this.grooveBpm &&
+      settings.playbackMode === "groove" &&
+      this.playbackMode === "groove";
+    if (
+      this.configured &&
+      (settings.soundMode !== this.mode ||
+        playbackChanged ||
+        activeGrooveTempoChanged)
+    ) {
+      this.reset();
+    }
     this.mode = settings.soundMode;
+    this.playbackMode = settings.playbackMode;
+    this.grooveBpm = settings.grooveBpm;
+    this.groove.configure(settings);
     this.configured = true;
     this.output.setJiaoSustainPitch(settings.jiaoSustainPitch);
   }
@@ -41,6 +77,10 @@ export class SoundController {
   handle(event: DogInputEvent): void {
     if (event.type === "reset") {
       this.reset();
+      return;
+    }
+    if (this.playbackMode === "groove") {
+      this.groove.handle(event);
       return;
     }
     if (event.phase === "down") this.handleDown(event);
@@ -51,6 +91,7 @@ export class SoundController {
     this.active.clear();
     this.nextAlternate = "da";
     this.alternateDaExpression = null;
+    this.groove.reset();
     this.output.stopAll();
   }
 
