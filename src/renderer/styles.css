@@ -187,8 +187,8 @@ body {
   z-index: 4;
   left: 68.359%;
   bottom: 0.977%;
-  width: 15.625%;
-  height: 15.625%;
+  width: clamp(28px, 15.625%, 112px);
+  height: clamp(28px, 15.625%, 112px);
   cursor: nwse-resize;
   pointer-events: auto;
   -webkit-app-region: no-drag;

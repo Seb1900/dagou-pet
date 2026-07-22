@@ -182,13 +182,21 @@ function defaultPosition(size: number): { x: number; y: number } {
 }
 
 function savedPosition(size: number): { x: number; y: number } {
-  if (settings.x === null || settings.y === null) return defaultPosition(size);
+  if (settings.x === null || settings.y === null) {
+    const area = screen.getPrimaryDisplay().workArea;
+    return constrainWindowPositionToWorkArea(
+      defaultPosition(size),
+      { x: 0, y: 0, width: size, height: size },
+      area
+    );
+  }
   const point = { x: settings.x, y: settings.y };
   const display = screen.getDisplayNearestPoint(point);
-  const area = display.workArea;
-  const x = Math.min(area.x + area.width - 64, Math.max(area.x - size + 64, point.x));
-  const y = Math.min(area.y + area.height - 64, Math.max(area.y, point.y));
-  return { x, y };
+  return constrainWindowPositionToWorkArea(
+    point,
+    { x: 0, y: 0, width: size, height: size },
+    display.workArea
+  );
 }
 
 function sendInput(event: DogInputEvent): void {
@@ -247,21 +255,28 @@ function applyWindowSettings(
   applyPetMousePolicy();
   const size = petWindowSize();
   const bounds = petWindow.getBounds();
-  if (bounds.width !== size || bounds.height !== size) {
-    const display = screen.getDisplayNearestPoint({
-      x: bounds.x + Math.round(bounds.width / 2),
-      y: bounds.y + Math.round(bounds.height / 2)
-    });
-    petWindow.setBounds(
-      resizeSquareFromAnchor(
-        bounds,
-        size,
-        display.workArea,
-        horizontalAnchor,
-        verticalAnchor
-      ),
-      true
-    );
+  const display = screen.getDisplayNearestPoint({
+    x: horizontalAnchor === "right"
+      ? bounds.x + bounds.width - 1
+      : bounds.x,
+    y: verticalAnchor === "bottom"
+      ? bounds.y + bounds.height - 1
+      : bounds.y
+  });
+  const nextBounds = resizeSquareFromAnchor(
+    bounds,
+    size,
+    display.workArea,
+    horizontalAnchor,
+    verticalAnchor
+  );
+  if (
+    bounds.x !== nextBounds.x ||
+    bounds.y !== nextBounds.y ||
+    bounds.width !== nextBounds.width ||
+    bounds.height !== nextBounds.height
+  ) {
+    petWindow.setBounds(nextBounds, true);
   }
 }
 
@@ -316,7 +331,7 @@ function volumeMenu(): Electron.MenuItemConstructorOptions[] {
 }
 
 function scaleMenu(): Electron.MenuItemConstructorOptions[] {
-  return [0.75, 1, 1.25, 1.5].map((scale) => ({
+  return [0.75, 1, 1.5, 2.5, 5].map((scale) => ({
     label: `${Math.round(scale * 100)}%`,
     type: "radio",
     checked: Math.abs(settings.scale - scale) < 0.01,

@@ -8,7 +8,7 @@ export const GROOVE_BPM_MIN = 96;
 export const GROOVE_BPM_MAX = 168;
 export const PET_WINDOW_BASE_SIZE = 310;
 export const PET_SCALE_MIN = 0.65;
-export const PET_SCALE_MAX = 1.6;
+export const PET_SCALE_MAX = 5;
 export const REACTION_INTENSITY_MIN = 0.5;
 export const REACTION_INTENSITY_MAX = 2;
 

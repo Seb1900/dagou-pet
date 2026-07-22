@@ -4,7 +4,6 @@ import {
   constrainWindowPositionToWorkArea,
   positionFromDragPointer,
   resizeSquareFromAnchor,
-  resizeSquareFromBottomRight,
   scaleFromResizePointer,
   shouldIgnorePetMouseEvents
 } from "../src/shared/window-geometry";
@@ -98,9 +97,19 @@ describe("constrainWindowPositionToWorkArea", () => {
     expect(position.y + collision.y).toBeGreaterThanOrEqual(50);
   });
 
-  it("centers an oversized collision rectangle deterministically", () => {
+  it("lets an oversized collision region travel while covering the work area", () => {
     expect(constrainWindowPositionToWorkArea(
       { x: 5_000, y: 5_000 },
+      { x: 0, y: 0, width: 2_000, height: 2_000 },
+      workArea
+    )).toEqual({ x: -292, y: -292 });
+    expect(constrainWindowPositionToWorkArea(
+      { x: -5_000, y: -5_000 },
+      { x: 0, y: 0, width: 2_000, height: 2_000 },
+      workArea
+    )).toEqual({ x: -708, y: -908 });
+    expect(constrainWindowPositionToWorkArea(
+      { x: -500, y: -600 },
       { x: 0, y: 0, width: 2_000, height: 2_000 },
       workArea
     )).toEqual({ x: -500, y: -600 });
@@ -153,33 +162,37 @@ describe("scaleFromResizePointer", () => {
     })).toBe(0.65);
     expect(scaleFromResizePointer({
       startSize: 310,
-      deltaX: 1_000,
+      deltaX: 10_000,
       deltaY: 20,
       flipHorizontal: false,
       flipVertical: false
-    })).toBe(1.6);
+    })).toBe(5);
   });
 });
 
-describe("resizeSquareFromBottomRight", () => {
+describe("resizeSquareFromAnchor", () => {
   it("keeps the lower-right anchor while resizing", () => {
     expect(
-      resizeSquareFromBottomRight(
+      resizeSquareFromAnchor(
         { x: 900, y: 500, width: 310, height: 310 },
         400,
-        { x: 0, y: 0, width: 1920, height: 1080 }
+        { x: 0, y: 0, width: 1920, height: 1080 },
+        "right",
+        "bottom"
       )
     ).toEqual({ x: 810, y: 410, width: 400, height: 400 });
   });
 
-  it("keeps a recoverable edge visible on any display", () => {
+  it("keeps the central visible region on displays with negative coordinates", () => {
     expect(
-      resizeSquareFromBottomRight(
+      resizeSquareFromAnchor(
         { x: -1900, y: 1300, width: 310, height: 310 },
         500,
-        { x: -1280, y: 0, width: 1280, height: 1024 }
+        { x: -1280, y: 0, width: 1280, height: 1024 },
+        "right",
+        "bottom"
       )
-    ).toEqual({ x: -1716, y: 960, width: 500, height: 500 });
+    ).toEqual({ x: -1353, y: 597, width: 500, height: 500 });
   });
 
   it("keeps the opposite corner fixed for a mirrored resize handle", () => {

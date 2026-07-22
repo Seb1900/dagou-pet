@@ -87,13 +87,11 @@ function constrainAxis(
   const maximum = Math.floor(
     workAreaStart + workAreaLength - collisionStart - collisionLength
   );
-  if (minimum > maximum) {
-    return Math.round(
-      workAreaStart + workAreaLength / 2 -
-      collisionStart - collisionLength / 2
-    );
-  }
-  return Math.min(maximum, Math.max(minimum, Math.round(requested)));
+  // Reversed limits mean the collision region is larger than the work area.
+  // In that case the work area stays inside it while the overflow can move.
+  const lower = Math.min(minimum, maximum);
+  const upper = Math.max(minimum, maximum);
+  return Math.min(upper, Math.max(lower, Math.round(requested)));
 }
 
 export function constrainWindowPositionToWorkArea(
@@ -174,8 +172,7 @@ export function resizeSquareFromAnchor(
   size: number,
   workArea: WindowRectangle,
   horizontalAnchor: HorizontalAnchor,
-  verticalAnchor: VerticalAnchor,
-  visibleEdge = 64
+  verticalAnchor: VerticalAnchor
 ): WindowRectangle {
   const anchoredX = horizontalAnchor === "right"
     ? bounds.x + bounds.width - size
@@ -183,32 +180,15 @@ export function resizeSquareFromAnchor(
   const anchoredY = verticalAnchor === "bottom"
     ? bounds.y + bounds.height - size
     : bounds.y;
+  const position = constrainWindowPositionToWorkArea(
+    { x: anchoredX, y: anchoredY },
+    { x: 0, y: 0, width: size, height: size },
+    workArea
+  );
   return {
-    x: Math.min(
-      workArea.x + workArea.width - visibleEdge,
-      Math.max(workArea.x - size + visibleEdge, anchoredX)
-    ),
-    y: Math.min(
-      workArea.y + workArea.height - visibleEdge,
-      Math.max(workArea.y, anchoredY)
-    ),
+    x: position.x,
+    y: position.y,
     width: size,
     height: size
   };
-}
-
-export function resizeSquareFromBottomRight(
-  bounds: WindowRectangle,
-  size: number,
-  workArea: WindowRectangle,
-  visibleEdge = 64
-): WindowRectangle {
-  return resizeSquareFromAnchor(
-    bounds,
-    size,
-    workArea,
-    "right",
-    "bottom",
-    visibleEdge
-  );
 }

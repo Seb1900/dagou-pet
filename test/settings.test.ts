@@ -24,7 +24,7 @@ describe("normalizeSettings", () => {
       reactionIntensity: 0
     });
     expect(high.volume).toBe(1);
-    expect(high.scale).toBe(1.6);
+    expect(high.scale).toBe(5);
     expect(high.reactionIntensity).toBe(2);
     expect(low.volume).toBe(0);
     expect(low.scale).toBe(0.65);

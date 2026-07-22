@@ -78,8 +78,10 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
         }
         break;
       case "stop-all":
-        this.voices.clear();
         this.pendingGroups.clear();
+        for (const voice of [...this.voices.values()]) {
+          this.releaseVoice(voice.id, "fade");
+        }
         break;
     }
   }

@@ -103,6 +103,52 @@ describe("DagouSustainProcessor", () => {
     expect(processor.voices.has(-1)).toBe(false);
   });
 
+  it("drops pending groups and fades active voices on stop-all", () => {
+    const Processor = loadProcessor();
+    const processor = new Processor();
+    processor.handleMessage({
+      type: "initialize",
+      samples: {
+        da: sine(300, 120),
+        gou: sine(300, 90),
+        jiao: sine(500, 120)
+      },
+      profiles: SUSTAIN_PROFILES
+    });
+    const da = {
+      sample: "da",
+      role: "normal",
+      pitchSemitones: 0,
+      gain: 0.92,
+      pan: 0
+    };
+    processor.handleMessage({ type: "note-on", pressId: 1, spec: da });
+    processor.handleMessage({
+      type: "note-off",
+      pressId: 1,
+      release: "tail",
+      followUp: {
+        pressId: -1,
+        spec: { ...da, sample: "gou" }
+      }
+    });
+    processor.handleMessage({
+      type: "schedule-voices",
+      groupId: "future",
+      startFrame: 10_000,
+      held: false,
+      voices: [{ pressId: -2, spec: da }]
+    });
+
+    processor.handleMessage({ type: "stop-all" });
+
+    expect(processor.pendingGroups.size).toBe(0);
+    expect(processor.voices.has(1)).toBe(true);
+    expect(processor.voices.get(1)?.forcedFadeRemaining).toBe(18);
+    renderBlock(processor);
+    expect(processor.voices.size).toBe(0);
+  });
+
   it("stays silent until an absolute target frame inside a render block", () => {
     const Processor = loadProcessor(1000);
     const processor = new Processor();
