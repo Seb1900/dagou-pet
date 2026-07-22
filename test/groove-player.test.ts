@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
-  AudioSampleName,
-  DogKeyInputEvent
+  DogKeyInputEvent,
+  KeyboardSampleName
 } from "../src/shared/contracts";
 import {
   createGrooveVoices,
@@ -174,7 +174,7 @@ describe("groove quantization", () => {
 });
 
 describe("groove harmony", () => {
-  const samples: readonly AudioSampleName[] = ["da", "gou", "jiao"];
+  const samples: readonly KeyboardSampleName[] = ["da", "gou", "jiao"];
 
   it("provides eight stable source-specific notes with a near-original tier", () => {
     for (const sample of samples) {

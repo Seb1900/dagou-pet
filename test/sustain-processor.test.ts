@@ -72,6 +72,37 @@ function renderBlock(processor: TestProcessor): Float32Array[][] {
 }
 
 describe("DagouSustainProcessor", () => {
+  it("plays ei once without a sustain profile and rejects held ei voices", () => {
+    const Processor = loadProcessor();
+    const processor = new Processor();
+    processor.handleMessage({
+      type: "initialize",
+      samples: {
+        da: sine(300, 120),
+        gou: sine(300, 90),
+        jiao: sine(500, 120),
+        ei: sine(220, 80)
+      },
+      profiles: SUSTAIN_PROFILES
+    });
+    const spec = {
+      sample: "ei",
+      role: "normal",
+      pitchSemitones: 0,
+      gain: 0.92,
+      pan: 0
+    };
+
+    processor.handleMessage({ type: "one-shot", pressId: -1, spec });
+    processor.handleMessage({ type: "note-on", pressId: 1, spec });
+    expect(processor.voices.has(-1)).toBe(true);
+    expect(processor.voices.has(1)).toBe(false);
+    expect(renderBlock(processor)[0][0].some((value) => Math.abs(value) > 0))
+      .toBe(true);
+    renderBlock(processor);
+    expect(processor.voices.has(-1)).toBe(false);
+  });
+
   it("stays silent until an absolute target frame inside a render block", () => {
     const Processor = loadProcessor(1000);
     const processor = new Processor();

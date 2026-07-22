@@ -90,10 +90,11 @@ async function setup() {
   vi.stubGlobal("window", { AudioContext: FakeAudioContext });
   vi.stubGlobal("AudioWorkletNode", FakeAudioWorkletNode);
   const engine = new AudioEngine();
-  await engine.initialize(async () => new ArrayBuffer(8));
+  const loader = vi.fn(async () => new ArrayBuffer(8));
+  await engine.initialize(loader);
   const context = FakeAudioContext.latest!;
   const worklet = FakeAudioWorkletNode.latest!;
-  return { context, worklet, engine };
+  return { context, worklet, engine, loader };
 }
 
 afterEach(() => {
@@ -103,14 +104,36 @@ afterEach(() => {
 });
 
 describe("AudioEngine", () => {
-  it("loads the worklet, downmixes all three samples and configures mastering", async () => {
-    const { context, worklet, engine } = await setup();
+  it("loads keyboard and interaction samples and configures mastering", async () => {
+    const { context, worklet, engine, loader } = await setup();
     expect(context.audioWorklet.addModule).toHaveBeenCalledTimes(1);
     expect(context.compressor?.threshold.value).toBe(-8);
     expect(context.compressor?.ratio.value).toBe(8);
     expect(context.gains[0].connections[0]).toBe(context.compressor);
     expect(context.compressor?.connections[0]).toBe(context.destination);
-    expect(worklet.port.messages[0]).toMatchObject({ type: "initialize" });
+    expect(loader.mock.calls.map(([name]) => name)).toEqual([
+      "da",
+      "gou",
+      "jiao",
+      "ei"
+    ]);
+    expect(worklet.port.messages[0]).toMatchObject({
+      type: "initialize",
+      samples: {
+        da: expect.anything(),
+        gou: expect.anything(),
+        jiao: expect.anything(),
+        ei: expect.anything()
+      },
+      profiles: {
+        da: expect.anything(),
+        gou: expect.anything(),
+        jiao: expect.anything()
+      }
+    });
+    expect(
+      (worklet.port.messages[0] as { profiles: Record<string, unknown> }).profiles
+    ).not.toHaveProperty("ei");
     engine.dispose();
   });
 
@@ -126,7 +149,14 @@ describe("AudioEngine", () => {
     engine.noteOn(4, spec);
     engine.setJiaoSustainPitch(3);
     engine.noteOff(4, "tail");
-    engine.playOneShot({ ...spec, sample: "gou", role: "normal" });
+    const ei = {
+      sample: "ei" as const,
+      role: "normal" as const,
+      pitchSemitones: 0,
+      gain: 0.92,
+      pan: 0
+    };
+    engine.playOneShot(ei);
     expect(worklet.port.messages.slice(1)).toEqual([
       { type: "note-on", pressId: 4, spec },
       { type: "jiao-pitch", semitones: 3 },
@@ -134,7 +164,7 @@ describe("AudioEngine", () => {
       {
         type: "one-shot",
         pressId: -1,
-        spec: { ...spec, sample: "gou", role: "normal" }
+        spec: ei
       }
     ]);
     engine.dispose();

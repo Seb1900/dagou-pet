@@ -93,7 +93,7 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
   ) {
     const samples = this.samples.get(spec.sample);
     const profile = this.profiles.get(spec.sample);
-    if (!samples || !profile) return;
+    if (!samples || (held && !profile)) return;
     this.reclaimVoice(spec.role);
     const baseRate = pitchRate(spec.pitchSemitones);
     const voice = {
@@ -222,8 +222,15 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
       value = this.read(voice.samples, voice.position);
       voice.position += voice.currentRate;
       if (voice.position >= voice.samples.length - 1) return null;
-      const crossfadeStart = voice.profile.loopEnd - voice.profile.crossfade;
-      if (voice.held && !voice.released && voice.position >= crossfadeStart) {
+      const crossfadeStart = voice.profile
+        ? voice.profile.loopEnd - voice.profile.crossfade
+        : Number.POSITIVE_INFINITY;
+      if (
+        voice.held &&
+        !voice.released &&
+        voice.profile &&
+        voice.position >= crossfadeStart
+      ) {
         voice.state = "sustain";
         voice.hasSustained = true;
         if (voice.spec.sample === "jiao") {

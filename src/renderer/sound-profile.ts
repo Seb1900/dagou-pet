@@ -1,7 +1,8 @@
 import type {
   AudioSampleName,
   DogKeyInputEvent,
-  DogKeyRole
+  DogKeyRole,
+  KeyboardSampleName
 } from "../shared/contracts";
 
 export interface SustainProfile {
@@ -10,9 +11,9 @@ export interface SustainProfile {
   crossfade: number;
 }
 
-export const SUSTAIN_PROFILES: Record<AudioSampleName, SustainProfile> = {
+export const SUSTAIN_PROFILES: Record<KeyboardSampleName, SustainProfile> = {
   da: { loopStart: 0.0635, loopEnd: 0.1195, crossfade: 0.01 },
-  gou: { loopStart: 0.1085, loopEnd: 0.16, crossfade: 0.01 },
+  gou: { loopStart: 0.145, loopEnd: 0.197, crossfade: 0.01 },
   jiao: { loopStart: 0.139, loopEnd: 0.22, crossfade: 0.014 }
 };
 
@@ -27,11 +28,12 @@ export interface VoiceSpec {
 const SAMPLE_GAINS: Record<AudioSampleName, number> = {
   da: 0.92,
   gou: 0.92,
-  jiao: 1
+  jiao: 1,
+  ei: 0.92
 };
 
 export function createVoiceSpec(
-  sample: AudioSampleName,
+  sample: KeyboardSampleName,
   input: Pick<DogKeyInputEvent, "role" | "pitchStep" | "pan">
 ): VoiceSpec {
   return {
@@ -40,6 +42,16 @@ export function createVoiceSpec(
     pitchSemitones: input.pitchStep,
     gain: SAMPLE_GAINS[sample],
     pan: input.pan
+  };
+}
+
+export function createEiVoiceSpec(): VoiceSpec {
+  return {
+    sample: "ei",
+    role: "normal",
+    pitchSemitones: 0,
+    gain: SAMPLE_GAINS.ei,
+    pan: 0
   };
 }
 

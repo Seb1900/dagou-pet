@@ -1,7 +1,7 @@
 import type {
-  AudioSampleName,
   DogInputEvent,
-  DogKeyInputEvent
+  DogKeyInputEvent,
+  KeyboardSampleName
 } from "../shared/contracts";
 import { MELODY_PITCH_STEPS } from "../shared/key-classifier";
 import type { AppSettings, SoundMode } from "../shared/settings";
@@ -16,10 +16,10 @@ export const GROOVE_IDLE_RESET_MS = 3_000;
 export const GROOVE_QUANTIZE_TOLERANCE_MS = 0.001;
 
 // Weighted-median YIN anchors for the bundled recordings.
-export const GROOVE_SOURCE_MIDI: Readonly<Record<AudioSampleName, number>> =
+export const GROOVE_SOURCE_MIDI: Readonly<Record<KeyboardSampleName, number>> =
   Object.freeze({
-    da: 71.32,
-    gou: 65.54,
+    da: 70.8990412038,
+    gou: 62.8424257167,
     jiao: 71.08
   });
 
@@ -27,10 +27,10 @@ export const GROOVE_SOURCE_MIDI: Readonly<Record<AudioSampleName, number>> =
 // This keeps a recognizable near-original tier while avoiding global A4
 // normalization and the extreme gou transposition it caused.
 export const GROOVE_TARGET_MIDI: Readonly<
-  Record<AudioSampleName, readonly number[]>
+  Record<KeyboardSampleName, readonly number[]>
 > = Object.freeze({
   da: Object.freeze([65, 67, 69, 71, 72, 74, 76, 77]),
-  gou: Object.freeze([60, 62, 64, 65, 67, 69, 71, 72]),
+  gou: Object.freeze([57, 59, 60, 62, 64, 65, 67, 69]),
   jiao: Object.freeze([65, 67, 69, 71, 72, 74, 76, 77])
 });
 
@@ -62,7 +62,7 @@ export interface GrooveOutput {
 
 interface GrooveHit {
   input: DogKeyInputEvent;
-  sample: AudioSampleName;
+  sample: KeyboardSampleName;
   ownerPressId: number;
   held: boolean;
 }
@@ -179,7 +179,7 @@ function clampPan(value: number): number {
 }
 
 export function createGrooveVoices(
-  sample: AudioSampleName,
+  sample: KeyboardSampleName,
   input: Pick<DogKeyInputEvent, "role" | "pitchStep" | "pan">,
   stepIndex: number
 ): VoiceSpec[] {
@@ -270,7 +270,7 @@ export class GroovePlayer {
       this.alternateDaInput = null;
     }
     let hitInput = input;
-    let sample: AudioSampleName;
+    let sample: KeyboardSampleName;
     if (input.role === "jiao") {
       sample = "jiao";
     } else if (this.soundMode === "da-gou") {

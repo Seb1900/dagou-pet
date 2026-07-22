@@ -19,6 +19,7 @@ import {
 import { AudioEngine } from "./audio-engine";
 import { DogAnimator } from "./dog-animation";
 import { SoundController } from "./sound-controller";
+import { createEiVoiceSpec } from "./sound-profile";
 
 function requireElement<T extends Element>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -383,16 +384,20 @@ function queueMove(
 
 function finishDrag(event: PointerEvent, allowPet: boolean): void {
   if (!dragGesture || event.pointerId !== dragGesture.pointerId) return;
-  const shouldPet = allowPet && !dragGesture.moved;
-  if (dragGesture.moved) sendPendingMove();
+  const gesture = dragGesture;
+  dragGesture = null;
+  const shouldPet = allowPet && !gesture.moved;
+  if (gesture.moved) sendPendingMove();
   if (dogHitbox.hasPointerCapture(event.pointerId)) {
     dogHitbox.releasePointerCapture(event.pointerId);
   }
-  dragGesture = null;
   stage.classList.remove("is-dragging");
   lastPointerPosition = { x: event.clientX, y: event.clientY };
   updatePetMouseInteraction(event.clientX, event.clientY);
-  if (shouldPet) animator.pet();
+  if (shouldPet) {
+    animator.pet();
+    audio.playOneShot(createEiVoiceSpec());
+  }
 }
 
 function sendPendingResize(): void {

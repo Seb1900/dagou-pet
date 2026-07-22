@@ -11,7 +11,10 @@ export const IPC_CHANNELS = {
   settingsChanged: "dagou:settings-changed"
 } as const;
 
-export const AUDIO_SAMPLE_NAMES = ["da", "gou", "jiao"] as const;
+export const KEYBOARD_SAMPLE_NAMES = ["da", "gou", "jiao"] as const;
+export type KeyboardSampleName = (typeof KEYBOARD_SAMPLE_NAMES)[number];
+
+export const AUDIO_SAMPLE_NAMES = [...KEYBOARD_SAMPLE_NAMES, "ei"] as const;
 export type AudioSampleName = (typeof AUDIO_SAMPLE_NAMES)[number];
 export type DogKeyRole = "normal" | "jiao";
 
