@@ -5,12 +5,25 @@ import type {
   PetMoveRequest
 } from "../shared/contracts";
 import type { AppSettings } from "../shared/settings";
+import type {
+  AppInfo,
+  ExternalTarget,
+  UpdateState
+} from "../shared/update-contracts";
 
 // Sandboxed preloads cannot require local modules unless they are bundled.
 const IPC_CHANNELS = {
   getSettings: "dagou:get-settings",
   updateSettings: "dagou:update-settings",
   resizePet: "dagou:resize-pet",
+  openSettings: "dagou:open-settings",
+  getAppInfo: "dagou:get-app-info",
+  openExternal: "dagou:open-external",
+  getUpdateState: "dagou:get-update-state",
+  checkForUpdates: "dagou:check-for-updates",
+  downloadUpdate: "dagou:download-update",
+  installUpdate: "dagou:install-update",
+  updateStateChanged: "dagou:update-state-changed",
   movePet: "dagou:move-pet",
   setPetMouseInteractive: "dagou:set-pet-mouse-interactive",
   input: "dagou:input",
@@ -32,11 +45,42 @@ const api = {
     ) as Promise<AppSettings>;
   },
 
-  resizePet(scale: number): Promise<AppSettings> {
+  resizePet(scale: number): void {
+    ipcRenderer.send(IPC_CHANNELS.resizePet, scale);
+  },
+
+  openSettings(): void {
+    ipcRenderer.send(IPC_CHANNELS.openSettings);
+  },
+
+  getAppInfo(): Promise<AppInfo> {
+    return ipcRenderer.invoke(IPC_CHANNELS.getAppInfo) as Promise<AppInfo>;
+  },
+
+  openExternal(target: ExternalTarget): Promise<void> {
+    return ipcRenderer.invoke(IPC_CHANNELS.openExternal, target) as Promise<void>;
+  },
+
+  getUpdateState(): Promise<UpdateState> {
     return ipcRenderer.invoke(
-      IPC_CHANNELS.resizePet,
-      scale
-    ) as Promise<AppSettings>;
+      IPC_CHANNELS.getUpdateState
+    ) as Promise<UpdateState>;
+  },
+
+  checkForUpdates(): Promise<UpdateState> {
+    return ipcRenderer.invoke(
+      IPC_CHANNELS.checkForUpdates
+    ) as Promise<UpdateState>;
+  },
+
+  downloadUpdate(): Promise<UpdateState> {
+    return ipcRenderer.invoke(
+      IPC_CHANNELS.downloadUpdate
+    ) as Promise<UpdateState>;
+  },
+
+  installUpdate(): void {
+    ipcRenderer.send(IPC_CHANNELS.installUpdate);
   },
 
   movePet(request: PetMoveRequest): void {
@@ -80,6 +124,18 @@ const api = {
     ) => callback(payload);
     ipcRenderer.on(IPC_CHANNELS.settingsChanged, listener);
     return () => ipcRenderer.removeListener(IPC_CHANNELS.settingsChanged, listener);
+  },
+
+  onUpdateStateChanged(callback: (state: UpdateState) => void): () => void {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: UpdateState
+    ) => callback(payload);
+    ipcRenderer.on(IPC_CHANNELS.updateStateChanged, listener);
+    return () => ipcRenderer.removeListener(
+      IPC_CHANNELS.updateStateChanged,
+      listener
+    );
   }
 };
 

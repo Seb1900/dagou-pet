@@ -1,0 +1,99 @@
+name: Release Windows
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Validate tag and changelog
+        shell: pwsh
+        run: |
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          $expectedTag = "v$($package.version)"
+          if ($env:GITHUB_REF_NAME -ne $expectedTag) {
+            throw "Tag $env:GITHUB_REF_NAME does not match package version $($package.version)"
+          }
+          $escapedVersion = [regex]::Escape($package.version)
+          if (-not (Select-String -Path CHANGELOG.md -Pattern "^## \[$escapedVersion\]" -Quiet)) {
+            throw "CHANGELOG.md does not contain version $($package.version)"
+          }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify source
+        run: npm run verify
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build Windows packages
+        shell: pwsh
+        run: |
+          npm pkg set buildCommit=$env:GITHUB_SHA
+          npx electron-builder --win --publish never
+
+      - name: Write checksums
+        run: node scripts/write-checksums.cjs
+
+      - name: Smoke test packages
+        run: npm run smoke:packaged
+
+      - name: Verify release files
+        shell: pwsh
+        run: |
+          $package = Get-Content package.json -Raw | ConvertFrom-Json
+          $required = @(
+            "release/Dagou-Desktop-Pet-Setup-$($package.version)-x64.exe",
+            "release/Dagou-Desktop-Pet-Portable-$($package.version)-x64.exe",
+            "release/latest.yml",
+            "release/SHA256SUMS.txt"
+          )
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "Missing release file: $path" }
+          }
+          if (-not (Get-ChildItem release -Filter "*.blockmap")) {
+            throw "Missing updater blockmap"
+          }
+
+      - name: Upload build archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: dagou-windows-${{ github.ref_name }}
+          if-no-files-found: error
+          path: |
+            release/Dagou-Desktop-Pet-Setup-*.exe
+            release/Dagou-Desktop-Pet-Setup-*.exe.blockmap
+            release/Dagou-Desktop-Pet-Portable-*.exe
+            release/latest.yml
+            release/SHA256SUMS.txt
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          body_path: .github/RELEASE_TEMPLATE.md
+          fail_on_unmatched_files: true
+          files: |
+            release/Dagou-Desktop-Pet-Setup-*.exe
+            release/Dagou-Desktop-Pet-Setup-*.exe.blockmap
+            release/Dagou-Desktop-Pet-Portable-*.exe
+            release/latest.yml
+            release/SHA256SUMS.txt

@@ -1,0 +1,24 @@
+# 素材来源台账
+
+登记日期：2026-07-23
+
+本仓库当前使用的桌宠图片、应用图标和声音由 Seb1900 提供，并作为项目内容随仓库发布。
+
+| 路径 | 用途 | SHA-256 |
+| --- | --- | --- |
+| `assets/branding/app-icon.ico` | Windows 应用和安装程序图标 | `545D1BED3221FBDB40049F35E3501705133528AF7675CD3AD84B392602FF67D8` |
+| `assets/branding/tray-icon.png` | 托盘和窗口图标 | `FDDD1BD3D37142D0158E6495948C8BEACAD8CFCCD76821596285A63A8C50697B` |
+| `assets/dagou/sounds/da.wav` | `da` 按键声音 | `271E33F66F0FEF82414C2D589C8358CB00D300E8FEF41518D2260CEABB22BE49` |
+| `assets/dagou/sounds/ei.wav` | 点击互动声音 | `AEF310F076560D13C53C9E4DAE52CB5AB2AAC43D7FC83A2AF29DD2BA44FD2E38` |
+| `assets/dagou/sounds/gou.wav` | `gou` 按键声音 | `FB83DF74EBFC5A701A4A35BC8126D9B28651E3B7CA814C55DAC4E80FCD75BC85` |
+| `assets/dagou/sounds/jiao.wav` | `jiao` 按键声音 | `DFB6164871E310B1C8D8D9FBCFB3D4F70ABA64E18018841FDA96C547426001A2` |
+| `assets/dagou/sprites/bark01.png` | 叫声状态 1 | `22835746D6909E42BFD85EF0AEEB25CFA469A87B3345BD96847DFDA858376367` |
+| `assets/dagou/sprites/bark02.png` | 叫声状态 2 | `EDB1E97BDFB9AF7CF0C8F876771964C1A403BB4DC1F499D18BDFF6AC3162D2E6` |
+| `assets/dagou/sprites/idle-scale.png` | 缩放交互状态 | `BF28A0924322FB48DB359A1FAEB1F13E90D7CD91CA7DAFCCA6EE687777717991` |
+| `assets/dagou/sprites/idle-shy-tail.png` | 害羞摇尾巴 | `9601C3580E2CF962D9F4119127EC53BF713B5BCF40EE344ECAF16AE9A7E24664` |
+| `assets/dagou/sprites/idle-shy.png` | 害羞状态 | `BFF981710DD2C54BC0BEDA86C23BAF9AA911B7365A7927BA5D347B8A1BF43DDF` |
+| `assets/dagou/sprites/idle.png` | 待机状态 | `74292C94C4D569B3EF99C57872B9BEC03B490413E174836C0B9DD4AD06799088` |
+
+提交新素材时应补充作者、取得日期、原始来源、授权条件和 SHA-256。无法确认授权的素材不得进入正式发布包。
+
+仓库内素材的使用范围受 [LICENSE.md](../LICENSE.md) 约束。

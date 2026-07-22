@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞
+    url: https://github.com/Seb1900/dagou-pet/security/advisories/new
+    about: 使用私密安全报告，避免公开尚未修复的漏洞。
+  - name: 使用与支持说明
+    url: https://github.com/Seb1900/dagou-pet/blob/main/SUPPORT.md
+    about: 查看下载来源、反馈渠道和提交信息要求。

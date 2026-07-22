@@ -7,9 +7,11 @@ import {
   nativeImage,
   powerMonitor,
   screen,
+  shell,
   Tray
 } from "electron";
-import { writeFileSync } from "node:fs";
+import { autoUpdater } from "electron-updater";
+import { readFileSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
@@ -20,9 +22,15 @@ import type {
 } from "../shared/contracts";
 import { AUDIO_SAMPLE_NAMES, IPC_CHANNELS } from "../shared/contracts";
 import {
+  normalizeSettings,
   PET_WINDOW_BASE_SIZE,
   type AppSettings
 } from "../shared/settings";
+import type {
+  AppInfo,
+  ExternalTarget,
+  UpdateState
+} from "../shared/update-contracts";
 import { resolveKeyExpression } from "../shared/key-classifier";
 import {
   constrainWindowPositionToWorkArea,
@@ -35,10 +43,20 @@ import {
 import { KeyboardHook } from "./keyboard-hook";
 import { KeyboardLifecycle } from "./keyboard-lifecycle";
 import { SettingsStore } from "./settings-store";
+import {
+  UpdateService,
+  type UpdateMode,
+  type UpdaterAdapter
+} from "./update-service";
 
 const EDGE_MARGIN = 22;
 const POSITION_SAVE_DELAY_MS = 250;
 const ALLOWED_AUDIO = new Set<AudioSampleName>(AUDIO_SAMPLE_NAMES);
+const EXTERNAL_URLS: Readonly<Record<ExternalTarget, string>> = Object.freeze({
+  project: "https://github.com/Seb1900/dagou-pet",
+  feedback: "https://my.feishu.cn/share/base/form/shrcnGOLHXa8CDRLcwwbDGRI9cf",
+  releases: "https://github.com/Seb1900/dagou-pet/releases"
+});
 const isSmokeTest = process.argv.includes("--smoke-test");
 const smokeResultPath = process.env.DAGOU_SMOKE_RESULT;
 const smokeUserDataPath = process.env.DAGOU_SMOKE_USER_DATA;
@@ -51,14 +69,15 @@ let tray: Tray | null = null;
 let keyboardHook: KeyboardHook | null = null;
 let keyboardLifecycle: KeyboardLifecycle | null = null;
 let settingsStore: SettingsStore | null = null;
+let updateService: UpdateService | null = null;
 let settings: AppSettings;
 let isQuitting = false;
 let rendererReady = false;
 let systemSuspended = false;
-let muteShortcutLabel: string | null = null;
 let clickThroughShortcutLabel: string | null = null;
 let petMouseInteractive = false;
 let positionSaveTimer: NodeJS.Timeout | null = null;
+let updateCheckTimer: NodeJS.Timeout | null = null;
 let smokeFinished = false;
 let smokePetReady = false;
 let smokeSettingsReady = false;
@@ -212,6 +231,50 @@ function broadcastSettings(): void {
   }
 }
 
+function broadcastUpdateState(state: UpdateState): void {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.webContents.send(IPC_CHANNELS.updateStateChanged, state);
+  }
+}
+
+function isTrustedSender(sender: Electron.WebContents): boolean {
+  return sender === petWindow?.webContents ||
+    sender === settingsWindow?.webContents;
+}
+
+function currentUpdateMode(): UpdateMode {
+  if (!app.isPackaged || isSmokeTest) return "disabled";
+  if (process.env.PORTABLE_EXECUTABLE_FILE) return "manual";
+  return "installed";
+}
+
+function buildCommit(): string | null {
+  try {
+    const metadata = JSON.parse(
+      readFileSync(join(app.getAppPath(), "package.json"), "utf8")
+    ) as { buildCommit?: unknown };
+    return typeof metadata.buildCommit === "string" &&
+      /^[0-9a-f]{7,40}$/i.test(metadata.buildCommit)
+      ? metadata.buildCommit.slice(0, 12)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function appInfo(): AppInfo {
+  return {
+    name: "大狗桌宠",
+    version: app.getVersion(),
+    author: "冰冰赚大钱",
+    copyright: "版权所有 © 2026 冰冰赚大钱",
+    electronVersion: process.versions.electron,
+    buildCommit: buildCommit(),
+    updateMode: currentUpdateMode(),
+    settingsNotice: settingsStore?.getNotice() ?? null
+  };
+}
+
 function schedulePositionSave(): void {
   if (!petWindow || petWindow.isDestroyed() || !settingsStore) return;
   if (positionSaveTimer) clearTimeout(positionSaveTimer);
@@ -321,29 +384,11 @@ function resetPosition(): void {
   broadcastSettings();
 }
 
-function volumeMenu(): Electron.MenuItemConstructorOptions[] {
-  return [0.25, 0.5, 0.75, 1].map((volume) => ({
-    label: `${Math.round(volume * 100)}%`,
-    type: "radio",
-    checked: Math.abs(settings.volume - volume) < 0.01,
-    click: () => updateSettings({ volume })
-  }));
-}
-
-function scaleMenu(): Electron.MenuItemConstructorOptions[] {
-  return [0.75, 1, 1.5, 2.5, 5].map((scale) => ({
-    label: `${Math.round(scale * 100)}%`,
-    type: "radio",
-    checked: Math.abs(settings.scale - scale) < 0.01,
-    click: () => updateSettings({ scale })
-  }));
-}
-
 function rebuildTrayMenu(): void {
   if (!tray) return;
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "打开设置...", click: showSettingsWindow },
+      { label: "设置...", click: showSettingsWindow },
       { type: "separator" },
       {
         label: "暂停监听",
@@ -351,49 +396,6 @@ function rebuildTrayMenu(): void {
         checked: !settings.listening,
         click: (item) => updateSettings({ listening: !item.checked })
       },
-      {
-        label: shortcutLabel("静音狗叫", muteShortcutLabel),
-        type: "checkbox",
-        checked: settings.muted,
-        click: (item) => updateSettings({ muted: item.checked })
-      },
-      { label: "声音大小", submenu: volumeMenu() },
-      { label: "桌宠大小", submenu: scaleMenu() },
-      {
-        label: "演奏方式",
-        submenu: [
-          {
-            label: "节奏乐谱",
-            type: "radio",
-            checked: settings.playbackMode === "groove",
-            click: () => updateSettings({ playbackMode: "groove" })
-          },
-          {
-            label: "即时反馈",
-            type: "radio",
-            checked: settings.playbackMode === "instant",
-            click: () => updateSettings({ playbackMode: "instant" })
-          }
-        ]
-      },
-      {
-        label: "声音模式",
-        submenu: [
-          {
-            label: "大 / 狗交替",
-            type: "radio",
-            checked: settings.soundMode === "alternate",
-            click: () => updateSettings({ soundMode: "alternate" })
-          },
-          {
-            label: "按下大，松开狗",
-            type: "radio",
-            checked: settings.soundMode === "da-gou",
-            click: () => updateSettings({ soundMode: "da-gou" })
-          }
-        ]
-      },
-      { type: "separator" },
       {
         label: shortcutLabel("鼠标穿透", clickThroughShortcutLabel),
         type: "checkbox",
@@ -424,19 +426,12 @@ function createTray(): void {
     .createFromPath(join(brandingDirectory(), "tray-icon.png"))
     .resize({ width: 32, height: 32, quality: "best" });
   tray = new Tray(icon);
-  tray.setToolTip("大狗叫桌宠");
+  tray.setToolTip("大狗桌宠");
   rebuildTrayMenu();
   tray.on("click", showSettingsWindow);
 }
 
 function registerShortcuts(): void {
-  muteShortcutLabel = registerFirstAvailableShortcut(
-    [
-      ["CommandOrControl+Alt+M", "Ctrl+Alt+M"],
-      ["CommandOrControl+Alt+Shift+M", "Ctrl+Alt+Shift+M"]
-    ],
-    () => updateSettings({ muted: !settings.muted })
-  );
   clickThroughShortcutLabel = registerFirstAvailableShortcut(
     [
       ["CommandOrControl+Alt+D", "Ctrl+Alt+D"],
@@ -444,9 +439,6 @@ function registerShortcuts(): void {
     ],
     () => updateSettings({ clickThrough: !settings.clickThrough })
   );
-  if (!muteShortcutLabel) {
-    console.warn("No mute shortcut is available; use the tray instead");
-  }
   if (!clickThroughShortcutLabel) {
     console.warn("No click-through shortcut is available; use the tray instead");
   }
@@ -546,13 +538,14 @@ function showSettingsWindow(): void {
     return;
   }
   settingsWindow = new BrowserWindow({
-    width: 560,
-    height: 760,
-    minWidth: 520,
-    minHeight: 680,
-    title: "大狗叫设置",
-    backgroundColor: "#f4f5f2",
+    width: 330,
+    height: 450,
+    title: "大狗桌宠",
+    backgroundColor: "#f7f7f8",
     autoHideMenuBar: true,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
     show: false,
     icon: join(brandingDirectory(), "tray-icon.png"),
     webPreferences: {
@@ -587,7 +580,53 @@ function showSettingsWindow(): void {
 }
 
 function registerIpc(): void {
-  ipcMain.handle(IPC_CHANNELS.getSettings, () => settings);
+  ipcMain.handle(IPC_CHANNELS.getSettings, (event) => {
+    if (!isTrustedSender(event.sender)) throw new Error("Invalid settings read");
+    return settings;
+  });
+  ipcMain.on(IPC_CHANNELS.openSettings, (event) => {
+    if (event.sender === petWindow?.webContents) showSettingsWindow();
+  });
+  ipcMain.handle(IPC_CHANNELS.getAppInfo, (event) => {
+    if (event.sender !== settingsWindow?.webContents) {
+      throw new Error("Invalid app info request");
+    }
+    return appInfo();
+  });
+  ipcMain.handle(
+    IPC_CHANNELS.openExternal,
+    async (event, requestedTarget: unknown) => {
+      if (
+        event.sender !== settingsWindow?.webContents ||
+        typeof requestedTarget !== "string" ||
+        !(requestedTarget in EXTERNAL_URLS)
+      ) {
+        throw new Error("Invalid external link request");
+      }
+      await shell.openExternal(EXTERNAL_URLS[requestedTarget as ExternalTarget]);
+    }
+  );
+  ipcMain.handle(IPC_CHANNELS.getUpdateState, (event) => {
+    if (event.sender !== settingsWindow?.webContents || !updateService) {
+      throw new Error("Invalid update state request");
+    }
+    return updateService.getState();
+  });
+  ipcMain.handle(IPC_CHANNELS.checkForUpdates, (event) => {
+    if (event.sender !== settingsWindow?.webContents || !updateService) {
+      throw new Error("Invalid update check request");
+    }
+    return updateService.check();
+  });
+  ipcMain.handle(IPC_CHANNELS.downloadUpdate, (event) => {
+    if (event.sender !== settingsWindow?.webContents || !updateService) {
+      throw new Error("Invalid update download request");
+    }
+    return updateService.download();
+  });
+  ipcMain.on(IPC_CHANNELS.installUpdate, (event) => {
+    if (event.sender === settingsWindow?.webContents) updateService?.install();
+  });
   ipcMain.handle(IPC_CHANNELS.updateSettings, (event, patch: unknown) => {
     const senderIsTrusted =
       event.sender === petWindow?.webContents ||
@@ -597,23 +636,19 @@ function registerIpc(): void {
     }
     return updateSettings(patch as Partial<AppSettings>);
   });
-  ipcMain.handle(IPC_CHANNELS.resizePet, (event, requestedScale: unknown) => {
+  ipcMain.on(IPC_CHANNELS.resizePet, (event, requestedScale: unknown) => {
     if (
       event.sender !== petWindow?.webContents ||
       typeof requestedScale !== "number" ||
-      !Number.isFinite(requestedScale) ||
-      !settingsStore
+      !Number.isFinite(requestedScale)
     ) {
-      throw new Error("Invalid pet resize request");
+      return;
     }
-    settings = settingsStore.update({ scale: requestedScale });
+    settings = normalizeSettings({ ...settings, scale: requestedScale });
     applyWindowSettings(
       settings.flipHorizontal ? "right" : "left",
       settings.flipVertical ? "bottom" : "top"
     );
-    broadcastSettings();
-    rebuildTrayMenu();
-    return settings;
   });
   ipcMain.on(IPC_CHANNELS.movePet, (event, payload: unknown) => {
     const window = petWindow;
@@ -696,8 +731,9 @@ function registerIpc(): void {
   });
   ipcMain.handle(
     IPC_CHANNELS.loadAudio,
-    async (_event, requestedName: unknown) => {
+    async (event, requestedName: unknown) => {
       if (
+        event.sender !== petWindow?.webContents ||
         typeof requestedName !== "string" ||
         !ALLOWED_AUDIO.has(requestedName as AudioSampleName)
       ) {
@@ -735,6 +771,16 @@ async function startApplication(): Promise<void> {
   writeSmokeResult({ stage: "main-ready" });
   settingsStore = new SettingsStore(app.getPath("userData"));
   settings = settingsStore.get();
+  const updateMode = currentUpdateMode();
+  updateService = new UpdateService(
+    updateMode,
+    app.getVersion(),
+    updateMode === "installed"
+      ? autoUpdater as unknown as UpdaterAdapter
+      : null,
+    broadcastUpdateState,
+    () => shell.openExternal(EXTERNAL_URLS.releases)
+  );
   registerIpc();
   petWindow = createPetWindow();
   writeSmokeResult({ stage: "window-created" });
@@ -746,7 +792,7 @@ async function startApplication(): Promise<void> {
     resolveKeyExpression(
       keyCode,
       settings.jiaoKeyCodes,
-      settings.melodyEnabled
+      settings.playbackMode === "groove"
     )
   );
   keyboardLifecycle = new KeyboardLifecycle(keyboardHook);
@@ -754,6 +800,11 @@ async function startApplication(): Promise<void> {
   registerShortcuts();
   createTray();
   registerPowerEvents();
+  if (updateMode === "installed") {
+    updateCheckTimer = setTimeout(() => {
+      void updateService?.check();
+    }, 10_000);
+  }
 }
 
 app.whenReady().then(startApplication).catch((error: unknown) => {
@@ -769,6 +820,7 @@ app.on("second-instance", () => {
 app.on("before-quit", () => {
   isQuitting = true;
   if (positionSaveTimer) clearTimeout(positionSaveTimer);
+  if (updateCheckTimer) clearTimeout(updateCheckTimer);
   try {
     keyboardLifecycle?.dispose();
   } catch (error: unknown) {

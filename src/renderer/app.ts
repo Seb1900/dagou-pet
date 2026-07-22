@@ -241,6 +241,7 @@ let resizeGesture: {
 } | null = null;
 let pendingResizeScale: number | null = null;
 let resizeFrameId: number | null = null;
+let currentResizeScale: number | null = null;
 let petMouseInteractive = false;
 let lastPointerPosition: { x: number; y: number } | null = null;
 let mouseFilterFrameId: number | null = null;
@@ -268,12 +269,12 @@ function applySettings(nextSettings: AppSettings): void {
   settings = nextSettings;
   if (nextSettings.clickThrough) cancelPointerGestures();
   audio.setVolume(nextSettings.volume);
-  audio.setMuted(nextSettings.muted);
+  audio.setMuted(false);
   sound.configure(nextSettings);
   animator.setReactionIntensity(nextSettings.reactionIntensity);
   dog.classList.toggle("is-flipped-horizontal", nextSettings.flipHorizontal);
   dog.classList.toggle("is-flipped-vertical", nextSettings.flipVertical);
-  stage.classList.toggle("is-muted", nextSettings.muted);
+  stage.classList.remove("is-muted");
   stage.classList.toggle("is-paused", !nextSettings.listening);
   stage.classList.toggle("is-click-through", nextSettings.clickThrough);
   updatePetMouseInteraction();
@@ -299,6 +300,7 @@ function cancelPointerGestures(): void {
   resizeGesture = null;
   pendingMove = null;
   pendingResizeScale = null;
+  currentResizeScale = null;
   if (moveFrameId !== null) cancelAnimationFrame(moveFrameId);
   if (resizeFrameId !== null) cancelAnimationFrame(resizeFrameId);
   moveFrameId = null;
@@ -406,12 +408,11 @@ function sendPendingResize(): void {
   if (pendingResizeScale === null) return;
   const scale = pendingResizeScale;
   pendingResizeScale = null;
-  void window.dagou.resizePet(scale).catch((error: unknown) => {
-    console.error("Failed to resize Dagou window", error);
-  });
+  window.dagou.resizePet(scale);
 }
 
 function queueResize(scale: number): void {
+  currentResizeScale = scale;
   pendingResizeScale = scale;
   if (resizeFrameId !== null) return;
   resizeFrameId = requestAnimationFrame(sendPendingResize);
@@ -420,14 +421,28 @@ function queueResize(scale: number): void {
 function finishResize(event: PointerEvent): void {
   if (!resizeGesture || event.pointerId !== resizeGesture.pointerId) return;
   sendPendingResize();
+  const finalScale = currentResizeScale;
   if (scaleHandle.hasPointerCapture(event.pointerId)) {
     scaleHandle.releasePointerCapture(event.pointerId);
   }
   resizeGesture = null;
+  currentResizeScale = null;
   stage.classList.remove("is-resizing");
   setScaleHover(scaleHandle.matches(":hover"));
   lastPointerPosition = { x: event.clientX, y: event.clientY };
   updatePetMouseInteraction(event.clientX, event.clientY);
+  if (finalScale !== null) {
+    void window.dagou.updateSettings({ scale: finalScale }).catch(
+      (error: unknown) => console.error("Failed to save Dagou scale", error)
+    );
+  }
+}
+
+function openSettingsFromContextMenu(event: MouseEvent): void {
+  if (settings?.clickThrough) return;
+  event.preventDefault();
+  event.stopPropagation();
+  window.dagou.openSettings();
 }
 
 dogHitbox.addEventListener("pointerenter", () => animator.showShy());
@@ -477,6 +492,7 @@ dogHitbox.addEventListener("pointermove", (event) => {
 });
 dogHitbox.addEventListener("pointerup", (event) => finishDrag(event, true));
 dogHitbox.addEventListener("pointercancel", (event) => finishDrag(event, false));
+dogHitbox.addEventListener("contextmenu", openSettingsFromContextMenu);
 
 scaleHandle.addEventListener("pointerenter", () => {
   animator.wakeFromShy();
@@ -514,6 +530,7 @@ scaleHandle.addEventListener("pointermove", (event) => {
 });
 scaleHandle.addEventListener("pointerup", finishResize);
 scaleHandle.addEventListener("pointercancel", finishResize);
+scaleHandle.addEventListener("contextmenu", openSettingsFromContextMenu);
 
 function handleInput(event: DogInputEvent): void {
   if (event.type === "reset") {

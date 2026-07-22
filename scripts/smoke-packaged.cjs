@@ -14,7 +14,7 @@ const releaseDirectory = process.argv[2]
   ? resolve(process.argv[2])
   : join(__dirname, "..", "release");
 const executables = [
-  join(releaseDirectory, "win-unpacked", "Dagou Desktop Pet.exe"),
+  join(releaseDirectory, "win-unpacked", "大狗桌宠.exe"),
   join(releaseDirectory, `Dagou-Desktop-Pet-Portable-${version}-x64.exe`)
 ].filter(existsSync);
 

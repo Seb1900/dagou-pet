@@ -7,69 +7,82 @@
       content="default-src 'self'; style-src 'self'; script-src 'self'"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>大狗叫设置</title>
+    <title>大狗桌宠</title>
     <link rel="stylesheet" href="./settings.css" />
   </head>
   <body>
     <main class="settings-shell">
-      <header class="settings-header">
-        <h1>大狗叫设置</h1>
-        <span id="save-state" class="save-state" aria-live="polite">已保存</span>
-      </header>
+      <nav class="settings-tabs" aria-label="设置分类" role="tablist">
+        <button class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="sound-panel" data-tab="sound">声音</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="pet-panel" data-tab="pet">桌宠</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="about-panel" data-tab="about">关于</button>
+      </nav>
 
-      <section class="settings-section">
-        <h2>演奏方式</h2>
-        <div class="segmented" role="radiogroup" aria-label="演奏方式">
-          <label>
-            <input type="radio" name="playback-mode" value="groove" />
-            <span>节奏乐谱</span>
-          </label>
-          <label>
-            <input type="radio" name="playback-mode" value="instant" />
-            <span>即时反馈</span>
-          </label>
-        </div>
-        <label id="groove-tempo-row" class="setting-row mode-detail" for="groove-bpm">
-          <span>速度</span>
-          <span id="groove-bpm-value" class="value"></span>
-          <input id="groove-bpm" type="range" min="96" max="168" step="4" />
-        </label>
-      </section>
+      <div class="settings-content">
+        <section id="sound-panel" class="tab-panel is-active" role="tabpanel" data-panel="sound">
+          <div class="section-block section-block-first">
+            <label class="range-row" for="volume">
+              <span>音量</span>
+              <output id="volume-value" class="value" for="volume"></output>
+              <input id="volume" type="range" min="0" max="100" step="1" />
+            </label>
+          </div>
 
-      <section class="settings-section">
-        <h2>声音模式</h2>
-        <div class="segmented" role="radiogroup" aria-label="声音模式">
-          <label>
-            <input type="radio" name="sound-mode" value="alternate" />
-            <span>大 / 狗交替</span>
-          </label>
-          <label>
-            <input type="radio" name="sound-mode" value="da-gou" />
-            <span>按下大，松开狗</span>
-          </label>
-        </div>
-      </section>
+          <div class="section-block">
+            <h2>声音模式</h2>
+            <p class="field-label">大狗 按键</p>
+            <div class="segmented" role="radiogroup" aria-label="大狗按键声音模式">
+              <label>
+                <input type="radio" name="sound-mode" value="alternate" />
+                <span>大 / 狗</span>
+              </label>
+              <label>
+                <input type="radio" name="sound-mode" value="da-gou" />
+                <span>大狗</span>
+              </label>
+            </div>
 
-      <section class="settings-section">
-        <h2>桌宠</h2>
-        <div class="setting-rows">
-          <label class="setting-row" for="pet-scale">
-            <span>大小</span>
-            <span id="pet-scale-value" class="value"></span>
-            <input id="pet-scale" type="range" min="65" max="500" step="1" />
-          </label>
-          <label class="setting-row" for="reaction-intensity">
-            <span>反应强度</span>
-            <span id="reaction-intensity-value" class="value"></span>
-            <input
-              id="reaction-intensity"
-              type="range"
-              min="50"
-              max="200"
-              step="5"
-            />
-          </label>
-          <div class="toggle-grid">
+            <div class="key-heading">
+              <span class="field-label">叫 按键</span>
+              <span id="key-count" class="key-count"></span>
+            </div>
+            <div id="jiao-keys" class="key-list"></div>
+            <div class="key-actions">
+              <button id="capture-key" class="primary-button" type="button">添加按键</button>
+              <button id="restore-keys" class="secondary-button" type="button">恢复默认</button>
+            </div>
+            <p id="capture-state" class="capture-state" aria-live="polite"></p>
+          </div>
+
+          <div class="section-block">
+            <label class="toggle-row" for="dog-melody">
+              <span>狗叫旋律</span>
+              <input id="dog-melody" type="checkbox" />
+              <span class="toggle" aria-hidden="true"></span>
+            </label>
+            <label id="groove-tempo-row" class="range-row detail-row" for="groove-bpm">
+              <span>速度</span>
+              <output id="groove-bpm-value" class="value" for="groove-bpm"></output>
+              <input id="groove-bpm" type="range" min="96" max="168" step="4" />
+            </label>
+          </div>
+        </section>
+
+        <section id="pet-panel" class="tab-panel" role="tabpanel" data-panel="pet" hidden>
+          <div class="section-block section-block-first">
+            <label class="range-row" for="pet-scale">
+              <span>大小</span>
+              <output id="pet-scale-value" class="value" for="pet-scale"></output>
+              <input id="pet-scale" type="range" min="65" max="500" step="1" />
+            </label>
+            <label class="range-row" for="reaction-intensity">
+              <span>反应强度</span>
+              <output id="reaction-intensity-value" class="value" for="reaction-intensity"></output>
+              <input id="reaction-intensity" type="range" min="50" max="200" step="5" />
+            </label>
+          </div>
+
+          <div class="section-block toggle-list">
             <label class="toggle-row" for="flip-horizontal">
               <span>左右镜像</span>
               <input id="flip-horizontal" type="checkbox" />
@@ -85,44 +98,51 @@
               <input id="always-on-top" type="checkbox" />
               <span class="toggle" aria-hidden="true"></span>
             </label>
+            <label class="toggle-row" for="click-through">
+              <span>鼠标穿透</span>
+              <input id="click-through" type="checkbox" />
+              <span class="toggle" aria-hidden="true"></span>
+            </label>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="settings-section">
-        <h2>声音</h2>
-        <div class="setting-rows">
-          <label class="setting-row" for="volume">
-            <span>音量</span>
-            <span id="volume-value" class="value"></span>
-            <input id="volume" type="range" min="0" max="100" step="1" />
-          </label>
-          <label class="toggle-row" for="melody-enabled">
-            <span>键区旋律</span>
-            <input id="melody-enabled" type="checkbox" />
-            <span class="toggle" aria-hidden="true"></span>
-          </label>
-          <label id="jiao-pitch-row" class="setting-row" for="jiao-pitch">
-            <span>叫的延音音高</span>
-            <span id="jiao-pitch-value" class="value"></span>
-            <input id="jiao-pitch" type="range" min="-7" max="7" step="1" />
-          </label>
-        </div>
-      </section>
+        <section id="about-panel" class="tab-panel" role="tabpanel" data-panel="about" hidden>
+          <div class="about-header">
+            <img class="about-icon" src="../../assets/branding/tray-icon.png" alt="" />
+            <div>
+              <h2 class="product-name">大狗桌宠</h2>
+              <p class="developer-line">开发者：冰冰赚大钱</p>
+            </div>
+          </div>
 
-      <section class="settings-section settings-section-last">
-        <div class="section-heading">
-          <h2>叫键</h2>
-          <span id="key-count" class="key-count"></span>
-        </div>
-        <div id="jiao-keys" class="key-list"></div>
-        <div class="key-actions">
-          <button id="capture-key" class="primary-button" type="button">添加按键</button>
-          <button id="restore-keys" class="secondary-button" type="button">恢复默认</button>
-        </div>
-        <p id="capture-state" class="capture-state" aria-live="polite"></p>
-      </section>
+          <p class="license-line">未经许可禁止商业使用</p>
+
+          <div class="update-block">
+            <div>
+              <strong>软件更新</strong>
+              <p id="update-status" aria-live="polite">正在读取更新状态</p>
+              <p id="update-detail" class="subtle"></p>
+            </div>
+            <button id="update-action" class="primary-button compact-button" type="button">检查更新</button>
+          </div>
+
+          <div class="link-grid">
+            <button type="button" data-external="feedback">反馈问题</button>
+            <button type="button" data-external="project">项目地址</button>
+            <button type="button" data-document="privacy">隐私说明</button>
+          </div>
+        </section>
+      </div>
     </main>
+
+    <dialog id="document-dialog" class="document-dialog">
+      <header>
+        <h2 id="document-title">隐私说明</h2>
+        <button id="close-document" class="icon-button" type="button" aria-label="关闭">×</button>
+      </header>
+      <pre id="document-body" class="document-body"></pre>
+    </dialog>
+
     <script type="module" src="./settings.ts"></script>
   </body>
 </html>

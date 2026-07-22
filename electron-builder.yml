@@ -1,8 +1,18 @@
 appId: com.dagou.desktoppet
-productName: Dagou Desktop Pet
+productName: 大狗桌宠
 asar: true
 npmRebuild: false
 nodeGypRebuild: false
+electronLanguages:
+  - zh-CN
+  - en-US
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
 asarUnpack:
   - node_modules/uiohook-napi/prebuilds/**/*.node
 files:
@@ -11,6 +21,12 @@ files:
   - package.json
   - node_modules/uiohook-napi/**/*
   - node_modules/node-gyp-build/**/*
+  - "!node_modules/uiohook-napi/libuiohook/**/*"
+  - "!node_modules/uiohook-napi/src/**/*"
+  - "!node_modules/uiohook-napi/prebuilds/darwin-*/**/*"
+  - "!node_modules/uiohook-napi/prebuilds/linux-*/**/*"
+  - "!node_modules/uiohook-napi/prebuilds/win32-arm64/**/*"
+  - "!node_modules/uiohook-napi/binding.gyp"
 extraResources:
   - from: assets/dagou/sounds
     to: assets/dagou/sounds
@@ -18,6 +34,16 @@ extraResources:
     to: assets/branding
     filter:
       - tray-icon.png
+  - from: LICENSE.md
+    to: legal/LICENSE.md
+  - from: NOTICE.md
+    to: legal/NOTICE.md
+  - from: PRIVACY.md
+    to: legal/PRIVACY.md
+  - from: THIRD_PARTY_NOTICES.md
+    to: legal/THIRD_PARTY_NOTICES.md
+  - from: assets/ASSET_PROVENANCE.md
+    to: legal/ASSET_PROVENANCE.md
 win:
   icon: assets/branding/app-icon.ico
   target:
@@ -27,14 +53,20 @@ win:
     - target: portable
       arch:
         - x64
+publish:
+  provider: github
+  owner: Seb1900
+  repo: dagou-pet
+  releaseType: draft
 directories:
   output: release
 nsis:
   artifactName: Dagou-Desktop-Pet-Setup-${version}-${arch}.${ext}
+  license: LICENSE.md
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: Dagou Desktop Pet
+  shortcutName: 大狗桌宠
 portable:
   artifactName: Dagou-Desktop-Pet-Portable-${version}-${arch}.${ext}

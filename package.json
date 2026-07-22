@@ -26,9 +26,10 @@
     "verify": "npm test && npm run build",
     "pack": "npm run build && electron-builder --dir",
     "smoke:packaged": "node scripts/smoke-packaged.cjs",
-    "dist:win": "npm run build && electron-builder --win && node scripts/write-checksums.cjs"
+    "dist:win": "npm run build && electron-builder --win --publish never && node scripts/write-checksums.cjs"
   },
   "dependencies": {
+    "electron-updater": "6.8.9",
     "uiohook-napi": "1.5.5"
   },
   "devDependencies": {
