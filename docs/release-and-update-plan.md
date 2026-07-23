@@ -1,70 +1,61 @@
 # 正式发布与自动更新
 
-本文只记录当前可执行的发布流程和仍需完成的验收，不把规划中的能力描述成现成功能。
+## 发行形式
 
-## 发布原则
+- 安装版：`Dagou-Desktop-Pet-Setup-<版本>-x64.exe`
+- Portable：`Dagou-Desktop-Pet-Portable-<版本>-x64.exe`
+- 校验文件：`SHA256SUMS.txt`
 
-- 官方版本通过 [Seb1900/dagou-pet Releases](https://github.com/Seb1900/dagou-pet/releases) 免费发布。
-- 源码和仓库内素材使用 PolyForm Noncommercial License 1.0.0；未经版权方书面许可，不得销售或付费分发。
-- Windows 安装版是普通用户的主要发行形式；免安装版由用户手动下载和替换。
-- 更新流程不收集按键、窗口标题、进程名或输入历史。
+两个 EXE 都包含运行所需的图片、声音和图标。用户无需安装运行库或下载额外资源。
 
-## 当前实现
+## 自动更新
 
-| 模块 | 当前状态 |
-| --- | --- |
-| 版本 | `0.3.0` 已公开发布；`0.3.1` 用于键盘白名单修复与真实跨版本更新验收 |
-| Windows 构建 | `electron-builder` 生成 NSIS x64 安装版和 Portable x64 免安装版 |
-| 构建加固 | 已启用 Electron fuses、ASAR 完整性校验并限制打包语言和原生文件 |
-| 随包声明 | 打包 `LICENSE.md`、`NOTICE.md`、`PRIVACY.md`、第三方声明和素材台账 |
-| 本地验证 | `npm run verify` 执行自动测试和完整构建；`npm run smoke:packaged` 检查打包程序 |
-| 产物校验 | `scripts/write-checksums.cjs` 要求安装版、blockmap、免安装版和 `latest.yml` 全部存在，再生成 `SHA256SUMS.txt` |
-| 自动发布 | `vX.Y.Z` Tag 触发 Windows 工作流，验证版本、测试、审计、构建并创建草稿 Release |
-| 安装版更新 | 启动后延迟静默检查；设置页支持检查、下载和重启安装，并显示版本、进度和错误状态 |
-| 免安装版更新 | 不原地覆盖，只打开官方 Releases 页面 |
-| 设置兼容 | 已有 schema 迁移、备份和损坏恢复逻辑 |
+安装版以同目录存在 `Uninstall.exe` 识别安装状态。启动约 8 秒后在后台执行：
 
-当前更新界面没有展示更新说明、文件大小或下载速度，也没有取消下载入口。代码具备基本更新状态机，但尚未经过两个真实发布版本的端到端验证。
+1. 使用 WinHTTP 请求 `Seb1900/dagou-pet` 的 latest Release。
+2. 使用 `semver` 比较当前版本和 `tag_name`。
+3. 精确选择同版本 `Setup-x64.exe` 和 `SHA256SUMS.txt`。
+4. 限制响应与安装包大小，下载到 `%LOCALAPPDATA%\dagou-pet\updates\v<版本>`。
+5. 比对 Release 资产大小和 SHA-256。
+6. 用户确认后启动 NSIS `/S /UPDATE`，当前进程退出。
+
+Portable 不下载或替换自身，只打开官方 Release 页面。
+
+## 构建
+
+```powershell
+.\scripts\build-native-release.ps1
+.\scripts\smoke-native-release.ps1
+```
+
+构建脚本依次执行格式检查、严格 Clippy、单元测试、release 构建、NSIS 打包和 SHA-256 生成。冒烟脚本校验文件名、哈希、32 MB 预算并启动 Portable。CI 额外执行静默安装、启动和卸载。
 
 ## 发布流程
 
-1. 同步更新 `package.json`、`package-lock.json` 版本，并把 `CHANGELOG.md` 的“未发布”内容整理为同版本标题和发布日期。
-2. 在干净工作树执行 `npm ci`、`npm run verify`、`npm audit --omit=dev --audit-level=high`、`npm run dist:win` 和 `npm run smoke:packaged`。
-3. 确认以下文件全部存在，且 `SHA256SUMS.txt` 覆盖前四项：
+1. 更新 `Cargo.toml` 版本与 `CHANGELOG.md`。
+2. 本地运行构建和冒烟脚本。
+3. 创建与 Cargo 版本一致的 `vX.Y.Z` Tag。
+4. GitHub Actions 构建三个发布文件并创建草稿 Release。
+5. 核对标题、正文、文件名、文件大小和 SHA-256。
+6. 人工测试 Windows 10/11 x64 后发布草稿。
+7. 发布下一版本时，用上一公开原生安装版完成真实 A 到 B 更新。
 
-```text
-Dagou-Desktop-Pet-Setup-<版本>-x64.exe
-Dagou-Desktop-Pet-Setup-<版本>-x64.exe.blockmap
-Dagou-Desktop-Pet-Portable-<版本>-x64.exe
-latest.yml
-SHA256SUMS.txt
-```
+## 覆盖安装
 
-4. 提交版本变更，创建与 `package.json` 完全一致的 `vX.Y.Z` Tag 并推送。
-5. 等待 `.github/workflows/release-windows.yml` 完成。工作流只创建草稿 Release，不会直接公开。
-6. 将拟公开的 Release 标题、完整正文、附件名和 SHA-256 交给 Seb1900 确认；未经确认不得公开。
-7. 在草稿中使用确认后的正文，核对附件和 SHA-256，完成 Windows 人工验收后再发布。
-8. 发布下一版本时，用已安装的上一正式版本完成应用内检查、下载、重启安装和设置保留验证。
+NSIS 使用旧 Electron 版本的卸载注册表键：
 
-工作流会拒绝 Tag 与包版本不一致、Changelog 缺少版本标题、测试失败、生产依赖高危审计失败或发布产物缺失的构建。
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\bc780249-420c-5c11-acac-c3642d232a28`
 
-## 发布前未完成
+安装时会读取旧目录并调用旧版静默卸载器，再写入原生程序。卸载脚本不会删除 `%APPDATA%\dagou-pet`，因此 schema v1、v2 设置可以由 schema v3 迁移。
 
-以下项目完成前，不应把自动更新描述为已通过生产验证：
+## 当前验收
 
-- [x] `v0.2.0` Tag 全流程已实跑，草稿 Release 的附件、权限和日志正确。
-- [x] `v0.3.0` Tag 全流程已实跑，线上测试、构建、冒烟和更新清单正确。
-- [ ] 使用两个真实版本完成 NSIS A 到 B 更新，确认版本、用户设置和窗口状态保留。
-- [ ] 在干净的 Windows 10 和 Windows 11 x64 环境验证安装、自定义目录、启动、退出、覆盖安装和卸载。
-- [ ] 验证离线、超时、GitHub 不可达、磁盘不足、下载损坏和安装失败后的提示与重试。
-- [ ] 为启动检查发现的新版本提供托盘提示或设置入口状态，避免用户必须主动打开“关于”页才能获知更新。
-- [ ] 明确是否补充更新说明、文件大小、速度和取消下载；当前 UI 不具备这些能力。
-- [ ] 验证设置文件损坏恢复时用户能够获知恢复结果。
+- [x] Rust 格式检查、严格 Clippy 和原生单元测试
+- [x] release EXE 构建与资源嵌入
+- [x] NSIS 静默安装、原生程序启动、线上版本检查和静默卸载
+- [x] Portable 启动与 SHA-256 校验
+- [x] 旧 Electron 注册表键、目录继承和设置保留逻辑
+- [ ] 使用两个已公开原生版本完成 GitHub Release A 到 B 更新
+- [ ] 在独立 Windows 10 与 Windows 11 实机执行完整人工回归
 
-稳定版/测试版通道、分批发布、回滚、匿名统计和崩溃上报不属于当前发布链路，后续引入时需要单独设计隐私、兼容和运维策略。
-
-## 回滚原则
-
-- 已公开的版本和附件不覆盖、不改写；修复时提高版本号重新发布。
-- 发现严重问题时先将对应 Release 标记为预发布或撤下公开入口，再发布修复版本。
-- Portable 用户始终手动替换文件；NSIS 用户只有在真实双版本验收通过后才主推应用内更新。
+在最后两项完成前，0.4.0 应标记为测试版。

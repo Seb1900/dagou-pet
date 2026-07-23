@@ -1,0 +1,56 @@
+[package]
+name = "dagou-pet"
+version = "0.4.0"
+edition = "2024"
+license = "PolyForm-Noncommercial-1.0.0"
+authors = ["Seb1900"]
+description = "大狗桌宠 Windows 原生客户端"
+repository = "https://github.com/Seb1900/dagou-pet"
+build = "build.rs"
+
+[[bin]]
+name = "dagou-pet"
+path = "native/src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+cpal = { version = "0.16", default-features = false }
+crossbeam-channel = "0.5"
+png = "0.17"
+semver = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+windows = { version = "0.61", features = [
+  "Foundation",
+  "Foundation_Numerics",
+  "Win32_Foundation",
+  "Win32_Graphics_Direct2D",
+  "Win32_Graphics_Direct2D_Common",
+  "Win32_Graphics_Dxgi_Common",
+  "Win32_Graphics_Gdi",
+  "Win32_Networking_WinHttp",
+  "Win32_Security",
+  "Win32_System_Com",
+  "Win32_System_ApplicationInstallationAndServicing",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Power",
+  "Win32_System_Threading",
+  "Win32_System_WindowsProgramming",
+  "Win32_UI_Controls",
+  "Win32_UI_HiDpi",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }
+windows-numerics = "0.2"
+
+[dev-dependencies]
+tempfile = "3.20"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+opt-level = "z"
+panic = "abort"
+strip = "symbols"

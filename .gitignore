@@ -1,10 +1,5 @@
-node_modules/
-dist/
-dist-electron/
+target/
 release/
-release-audit-temp/
-coverage/
-*.tsbuildinfo
 *.log
 .env
 .env.*
