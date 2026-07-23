@@ -2,7 +2,7 @@
 
 ![大狗桌宠预览](assets/dagou/sprites/idle.png)
 
-[下载最新版](https://github.com/Seb1900/dagou-pet/releases/latest) · [反馈问题](https://my.feishu.cn/share/base/form/shrcnGOLHXa8CDRLcwwbDGRI9cf) · 当前版本 `0.2.0`
+[下载最新版](https://github.com/Seb1900/dagou-pet/releases/latest) · [反馈问题](https://my.feishu.cn/share/base/form/shrcnGOLHXa8CDRLcwwbDGRI9cf) · 当前版本 `0.3.0`
 
 一个会响应全局键盘输入的 Windows 桌宠。用户在其他应用中打字时，桌宠会播放 `da`、`gou`、`jiao` 三种键盘声音并做出动作；点击桌宠会播放独立的 `ei` 互动音效。应用不会抢走当前窗口焦点或拦截原有按键。
 
@@ -23,7 +23,7 @@
 
 ## 功能
 
-- 狗叫旋律开关：开启后按节奏与音高演奏，关闭后原调即时响应。
+- 狗叫旋律开关：开启后会在原有节奏上加入循环的音高起伏，关闭后原调即时响应。
 - 两种声音模式：`大 / 狗`、`大狗`。
 - 狗叫旋律开启或关闭时都支持长按延音；松键后会从循环接回原始录音尾音。
 - `gou` 继承对应 `da` 的键区与声像表达，可调节旋律速度、音量和反应强度。

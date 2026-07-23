@@ -46,6 +46,14 @@ export const GROOVE_CHORDS: readonly GrooveChord[] = Object.freeze([
   { name: "IV", pitchClasses: Object.freeze([5, 9, 0]) }
 ]);
 
+// The existing keyboard pitch remains the base. This small contour adds
+// melodic movement without changing timing or the da/gou interval mapping.
+export const GROOVE_PITCH_CONTOUR = Object.freeze([
+  0, 1, 2, 1,
+  -1, 0, 2, 1,
+  -2, 0, 1, 0
+] as const);
+
 const CONSONANT_INTERVALS = new Set([3, 4, 5, 7, 8, 9]);
 const MAX_HARMONY_TRANSPOSITION = 7;
 
@@ -63,6 +71,7 @@ export interface GrooveOutput {
 interface GrooveHit {
   input: DogKeyInputEvent;
   sample: KeyboardSampleName;
+  pitchIndex: number;
   ownerPressId: number;
   held: boolean;
 }
@@ -77,6 +86,7 @@ interface ActiveGroovePress {
   input: DogKeyInputEvent;
   downStep: number;
   groupId: string | null;
+  responsePitchIndex: number | null;
 }
 
 interface QueueResult {
@@ -124,6 +134,18 @@ function closestPitchIndex(pitchStep: number): number {
 
 function pitchClass(midi: number): number {
   return ((Math.round(midi) % 12) + 12) % 12;
+}
+
+export function resolveGroovePitchIndex(
+  pairNumber: number,
+  pitchStep: number
+): number {
+  const contourIndex = ((pairNumber % GROOVE_PITCH_CONTOUR.length) +
+    GROOVE_PITCH_CONTOUR.length) % GROOVE_PITCH_CONTOUR.length;
+  return Math.min(
+    MELODY_PITCH_STEPS.length - 1,
+    Math.max(0, closestPitchIndex(pitchStep) + GROOVE_PITCH_CONTOUR[contourIndex])
+  );
 }
 
 function chordCandidates(
@@ -181,14 +203,14 @@ function clampPan(value: number): number {
 export function createGrooveVoices(
   sample: KeyboardSampleName,
   input: Pick<DogKeyInputEvent, "role" | "pitchStep" | "pan">,
-  stepIndex: number
+  stepIndex: number,
+  pitchIndex = closestPitchIndex(input.pitchStep)
 ): VoiceSpec[] {
   const chordIndex = Math.floor(stepIndex / GROOVE_STEPS_PER_BAR) %
     GROOVE_CHORDS.length;
   const chord = GROOVE_CHORDS[chordIndex];
-  const strongBeat = stepIndex % GROOVE_STEPS_PER_BEAT === 0;
-  const pitchIndex = closestPitchIndex(input.pitchStep);
   const sourceMidi = GROOVE_SOURCE_MIDI[sample];
+  const strongBeat = stepIndex % GROOVE_STEPS_PER_BEAT === 0;
   const requestedMidi = GROOVE_TARGET_MIDI[sample][pitchIndex];
   const primaryMidi = strongBeat || input.role === "jiao"
     ? closestChordTone(requestedMidi, chord, sourceMidi)
@@ -232,6 +254,8 @@ export class GroovePlayer {
   private nextAvailableStep = 0;
   private nextAlternate: "da" | "gou" = "da";
   private alternateDaInput: DogKeyInputEvent | null = null;
+  private alternatePitchIndex: number | null = null;
+  private nextPairNumber = 0;
   private transportId = 0;
 
   constructor(private readonly output: GrooveOutput) {}
@@ -258,6 +282,8 @@ export class GroovePlayer {
     this.nextAvailableStep = 0;
     this.nextAlternate = "da";
     this.alternateDaInput = null;
+    this.alternatePitchIndex = null;
+    this.nextPairNumber = 0;
     this.transportId += 1;
   }
 
@@ -268,33 +294,47 @@ export class GroovePlayer {
     if (idle) {
       this.nextAlternate = "da";
       this.alternateDaInput = null;
+      this.alternatePitchIndex = null;
+      this.nextPairNumber = 0;
     }
     let hitInput = input;
     let sample: KeyboardSampleName;
+    let pitchIndex: number;
+    let responsePitchIndex: number | null = null;
     if (input.role === "jiao") {
       sample = "jiao";
+      pitchIndex = closestPitchIndex(input.pitchStep);
     } else if (this.soundMode === "da-gou") {
       sample = "da";
+      pitchIndex = this.takeGroovePitchIndex(input.pitchStep);
+      responsePitchIndex = pitchIndex;
     } else if (this.nextAlternate === "da") {
       sample = "da";
       this.nextAlternate = "gou";
       this.alternateDaInput = input;
+      this.alternatePitchIndex = this.takeGroovePitchIndex(input.pitchStep);
+      pitchIndex = this.alternatePitchIndex;
     } else {
       sample = "gou";
       this.nextAlternate = "da";
       hitInput = this.alternateDaInput ?? input;
       this.alternateDaInput = null;
+      pitchIndex = this.alternatePitchIndex ??
+        this.takeGroovePitchIndex(hitInput.pitchStep);
+      this.alternatePitchIndex = null;
     }
     const queued = this.queue({
       input: hitInput,
       sample,
+      pitchIndex,
       ownerPressId: input.pressId,
       held: true
     }, 0, nowMs);
     this.activePresses.set(input.pressId, {
       input,
       downStep: queued.stepIndex,
-      groupId: queued.groupId
+      groupId: queued.groupId,
+      responsePitchIndex
     });
   }
 
@@ -303,10 +343,15 @@ export class GroovePlayer {
     if (!active) return;
     this.activePresses.delete(input.pressId);
     if (active.groupId) this.output.releaseGroup(active.groupId);
-    if (active.input.role === "normal" && this.soundMode === "da-gou") {
+    if (
+      active.input.role === "normal" &&
+      this.soundMode === "da-gou" &&
+      active.responsePitchIndex !== null
+    ) {
       this.queue({
         input: active.input,
         sample: "gou",
+        pitchIndex: active.responsePitchIndex,
         ownerPressId: input.pressId,
         held: false
       }, active.downStep + 1);
@@ -345,6 +390,7 @@ export class GroovePlayer {
         this.detachGroupFromOwner(replaceable);
         replaceable.input = hit.input;
         replaceable.sample = hit.sample;
+        replaceable.pitchIndex = hit.pitchIndex;
         replaceable.ownerPressId = hit.ownerPressId;
         replaceable.held = hit.held;
         this.schedule(replaceable);
@@ -374,9 +420,15 @@ export class GroovePlayer {
   private schedule(hit: ScheduledGrooveHit): void {
     this.output.scheduleVoices(
       hit.groupId,
-      createGrooveVoices(hit.sample, hit.input, hit.stepIndex),
+      createGrooveVoices(hit.sample, hit.input, hit.stepIndex, hit.pitchIndex),
       hit.atMs / 1000,
       hit.held
     );
+  }
+
+  private takeGroovePitchIndex(pitchStep: number): number {
+    const pairNumber = this.nextPairNumber;
+    this.nextPairNumber += 1;
+    return resolveGroovePitchIndex(pairNumber, pitchStep);
   }
 }

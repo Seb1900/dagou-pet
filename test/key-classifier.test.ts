@@ -10,8 +10,9 @@ import {
 } from "../src/shared/key-classifier";
 
 describe("physical key mapping", () => {
-  it("uses enter, space, backspace and delete groups as default jiao keys", () => {
+  it("uses Escape, enter, space, backspace and delete as default jiao keys", () => {
     for (const keyCode of [
+      KEY_CODES.escape,
       KEY_CODES.enter,
       KEY_CODES.numpadEnter,
       KEY_CODES.space,

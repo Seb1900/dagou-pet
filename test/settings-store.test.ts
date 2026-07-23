@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SettingsStore } from "../src/main/settings-store";
+import { KEY_CODES } from "../src/shared/key-classifier";
 import { DEFAULT_SETTINGS } from "../src/shared/settings";
 
 const directories: string[] = [];
@@ -28,7 +29,7 @@ describe("SettingsStore", () => {
 
     const current = JSON.parse(readFileSync(join(directory, "settings.json"), "utf8"));
     const backup = JSON.parse(readFileSync(join(directory, "settings.json.bak"), "utf8"));
-    expect(current.schemaVersion).toBe(1);
+    expect(current.schemaVersion).toBe(2);
     expect(current.settings.volume).toBe(0.6);
     expect(backup.settings.volume).toBe(0.4);
   });
@@ -45,7 +46,51 @@ describe("SettingsStore", () => {
     expect(store.get().volume).toBe(0.35);
     expect(store.get().scale).toBe(1.7);
     const stored = JSON.parse(readFileSync(join(directory, "settings.json"), "utf8"));
-    expect(stored.schemaVersion).toBe(1);
+    expect(stored.schemaVersion).toBe(2);
+  });
+
+  it("adds Escape when migrating the v1 default jiao keys", () => {
+    const directory = temporaryDirectory();
+    const legacyDefaults = [
+      KEY_CODES.enter,
+      KEY_CODES.numpadEnter,
+      KEY_CODES.space,
+      KEY_CODES.backspace,
+      KEY_CODES.delete,
+      KEY_CODES.numpadDelete
+    ];
+    writeFileSync(
+      join(directory, "settings.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        settings: { jiaoKeyCodes: legacyDefaults }
+      }),
+      "utf8"
+    );
+
+    const store = new SettingsStore(directory);
+
+    expect(store.get().jiaoKeyCodes).toEqual(DEFAULT_SETTINGS.jiaoKeyCodes);
+    expect(store.get().jiaoKeyCodes).toContain(KEY_CODES.escape);
+    const stored = JSON.parse(
+      readFileSync(join(directory, "settings.json"), "utf8")
+    );
+    expect(stored.schemaVersion).toBe(2);
+  });
+
+  it("preserves customized jiao keys when migrating v1", () => {
+    const directory = temporaryDirectory();
+    const customKeys = [KEY_CODES.space, KEY_CODES.escape];
+    writeFileSync(
+      join(directory, "settings.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        settings: { jiaoKeyCodes: customKeys }
+      }),
+      "utf8"
+    );
+
+    expect(new SettingsStore(directory).get().jiaoKeyCodes).toEqual(customKeys);
   });
 
   it("recovers a damaged primary file from its backup", () => {
@@ -53,7 +98,7 @@ describe("SettingsStore", () => {
     writeFileSync(join(directory, "settings.json"), "broken", "utf8");
     writeFileSync(
       join(directory, "settings.json.bak"),
-      JSON.stringify({ schemaVersion: 1, settings: { volume: 0.25 } }),
+      JSON.stringify({ schemaVersion: 2, settings: { volume: 0.25 } }),
       "utf8"
     );
 

@@ -1,16 +1,7 @@
-# 大狗桌宠 Windows 版本
+这次，大狗的叫声更有起伏了。
 
-此 Release 由版本 Tag 自动构建，并以草稿形式创建。正式发布前请根据对应的 [CHANGELOG](https://github.com/Seb1900/dagou-pet/blob/main/CHANGELOG.md) 条目补充本版本变化，并完成人工验收。
+- 旋律模式增加循环音高变化，原来的节奏和“大狗”衔接不变。
+- `Esc` 默认也会触发“叫”，点击桌宠的 `ei` 收尾更自然。
+- 即时模式、长按和松键尾音照旧。
 
-## 附件
-
-- 安装版：`Dagou-Desktop-Pet-Setup-*-x64.exe`
-- 免安装版：`Dagou-Desktop-Pet-Portable-*-x64.exe`
-- 校验值：`SHA256SUMS.txt`
-- 自动更新清单：`latest.yml` 和安装包 `blockmap`
-
-## 系统要求
-
-- Windows 10/11 x64
-
-请只从本仓库 Releases 下载官方版本，并使用 `SHA256SUMS.txt` 核对附件。官方版本免费发布，未经许可禁止商业使用。
+安装版可从 v0.2.0 直接更新；免安装版请重新下载。

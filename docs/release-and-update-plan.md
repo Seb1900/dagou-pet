@@ -13,7 +13,7 @@
 
 | 模块 | 当前状态 |
 | --- | --- |
-| 版本 | `0.2.0` 源码与本地发行包已完成验证，等待创建同版本 Tag 和草稿 Release |
+| 版本 | `0.2.0` 已公开发布；`0.3.0` 用于首次真实跨版本更新验收 |
 | Windows 构建 | `electron-builder` 生成 NSIS x64 安装版和 Portable x64 免安装版 |
 | 构建加固 | 已启用 Electron fuses、ASAR 完整性校验并限制打包语言和原生文件 |
 | 随包声明 | 打包 `LICENSE.md`、`NOTICE.md`、`PRIVACY.md`、第三方声明和素材台账 |
@@ -28,7 +28,7 @@
 
 ## 发布流程
 
-1. 更新 `package.json` 版本，并把 `CHANGELOG.md` 的“未发布”内容整理为同版本标题和发布日期。
+1. 同步更新 `package.json`、`package-lock.json` 版本，并把 `CHANGELOG.md` 的“未发布”内容整理为同版本标题和发布日期。
 2. 在干净工作树执行 `npm ci`、`npm run verify`、`npm audit --omit=dev --audit-level=high`、`npm run dist:win` 和 `npm run smoke:packaged`。
 3. 确认以下文件全部存在，且 `SHA256SUMS.txt` 覆盖前四项：
 
@@ -42,8 +42,9 @@ SHA256SUMS.txt
 
 4. 提交版本变更，创建与 `package.json` 完全一致的 `vX.Y.Z` Tag 并推送。
 5. 等待 `.github/workflows/release-windows.yml` 完成。工作流只创建草稿 Release，不会直接公开。
-6. 在草稿中补充本版本变化，核对附件和 SHA-256，完成 Windows 人工验收后再发布。
-7. 发布下一版本时，用已安装的上一正式版本完成应用内检查、下载、重启安装和设置保留验证。
+6. 将拟公开的 Release 标题、完整正文、附件名和 SHA-256 交给 Seb1900 确认；未经确认不得公开。
+7. 在草稿中使用确认后的正文，核对附件和 SHA-256，完成 Windows 人工验收后再发布。
+8. 发布下一版本时，用已安装的上一正式版本完成应用内检查、下载、重启安装和设置保留验证。
 
 工作流会拒绝 Tag 与包版本不一致、Changelog 缺少版本标题、测试失败、生产依赖高危审计失败或发布产物缺失的构建。
 
@@ -51,7 +52,7 @@ SHA256SUMS.txt
 
 以下项目完成前，不应把自动更新描述为已通过生产验证：
 
-- [ ] 首次 `vX.Y.Z` Tag 全流程实跑，并确认草稿 Release 的附件、权限和日志正确。
+- [x] `v0.2.0` Tag 全流程已实跑，草稿 Release 的附件、权限和日志正确。
 - [ ] 使用两个真实版本完成 NSIS A 到 B 更新，确认版本、用户设置和窗口状态保留。
 - [ ] 在干净的 Windows 10 和 Windows 11 x64 环境验证安装、自定义目录、启动、退出、覆盖安装和卸载。
 - [ ] 验证离线、超时、GitHub 不可达、磁盘不足、下载损坏和安装失败后的提示与重试。

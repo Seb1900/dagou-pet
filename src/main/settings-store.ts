@@ -13,10 +13,19 @@ import {
   normalizeSettings,
   type AppSettings
 } from "../shared/settings";
+import { KEY_CODES } from "../shared/key-classifier";
 
-const SETTINGS_SCHEMA_VERSION = 1;
+const SETTINGS_SCHEMA_VERSION = 2;
+const LEGACY_DEFAULT_JIAO_KEY_CODES = Object.freeze([
+  KEY_CODES.enter,
+  KEY_CODES.numpadEnter,
+  KEY_CODES.space,
+  KEY_CODES.backspace,
+  KEY_CODES.delete,
+  KEY_CODES.numpadDelete
+]);
 
-interface StoredSettingsV1 {
+interface StoredSettingsV2 {
   schemaVersion: typeof SETTINGS_SCHEMA_VERSION;
   settings: AppSettings;
 }
@@ -35,6 +44,27 @@ function cloneDefaults(): AppSettings {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
+}
+
+function hasSameKeyCodes(value: unknown, expected: readonly number[]): boolean {
+  if (!Array.isArray(value) || value.length !== expected.length) return false;
+  const codes = new Set(value);
+  return codes.size === expected.length &&
+    expected.every((keyCode) => codes.has(keyCode));
+}
+
+function migrateV1Settings(value: unknown): AppSettings {
+  const normalized = normalizeSettings(value);
+  if (!isRecord(value) || !hasSameKeyCodes(
+    value.jiaoKeyCodes,
+    LEGACY_DEFAULT_JIAO_KEY_CODES
+  )) {
+    return normalized;
+  }
+  return {
+    ...normalized,
+    jiaoKeyCodes: [...DEFAULT_SETTINGS.jiaoKeyCodes]
+  };
 }
 
 export class SettingsStore {
@@ -116,6 +146,12 @@ export class SettingsStore {
         rewrite: false
       };
     }
+    if (isRecord(parsed) && parsed.schemaVersion === 1) {
+      return {
+        settings: migrateV1Settings(parsed.settings),
+        rewrite: true
+      };
+    }
     if (isRecord(parsed) && "schemaVersion" in parsed) {
       throw new Error("Unsupported settings schema");
     }
@@ -141,7 +177,7 @@ export class SettingsStore {
   private write(nextSettings: AppSettings): void {
     mkdirSync(dirname(this.filePath), { recursive: true });
     const temporaryPath = `${this.filePath}.tmp`;
-    const stored: StoredSettingsV1 = {
+    const stored: StoredSettingsV2 = {
       schemaVersion: SETTINGS_SCHEMA_VERSION,
       settings: nextSettings
     };

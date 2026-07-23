@@ -13,6 +13,7 @@ export const KEY_CODES = Object.freeze({
 });
 
 export const DEFAULT_JIAO_KEY_CODES: readonly number[] = Object.freeze([
+  KEY_CODES.escape,
   KEY_CODES.enter,
   KEY_CODES.numpadEnter,
   KEY_CODES.space,

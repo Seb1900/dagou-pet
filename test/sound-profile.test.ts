@@ -33,7 +33,7 @@ describe("sound profiles", () => {
       da: "271e33f66f0fef82414c2d589c8358cb00d300e8fef41518d2260ceabb22be49",
       gou: "fb83df74ebfc5a701a4a35bc8126d9b28651e3b7ca814c55dac4e80fcd75bc85",
       jiao: "dfb6164871e310b1c8d8d9fbcfb3d4f70aba64e18018841fda96c547426001a2",
-      ei: "aef310f076560d13c53c9e4dae52cb5ab2aac43d7fc83a2af29dd2ba44fd2e38"
+      ei: "83d860012268c2266f4b63ec1625f9aa53835fd81a729d7fb3329bac0103b5f8"
     } as const;
     for (const name of AUDIO_SAMPLE_NAMES) {
       const bytes = readFileSync(
