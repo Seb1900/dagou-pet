@@ -23,6 +23,33 @@ beforeEach(() => {
 });
 
 describe("KeyboardHook", () => {
+  it("ignores key events outside the settings keyboard", () => {
+    const emit = vi.fn();
+    const resolveKey = vi.fn(() => ({
+      role: "normal" as const,
+      pitchStep: 0,
+      pan: 0
+    }));
+    const hook = new KeyboardHook(emit, resolveKey);
+    hook.start();
+
+    hookMock.listeners.get("keydown")?.({ keycode: 0x005b });
+    hookMock.listeners.get("keyup")?.({ keycode: 0x005b });
+    expect(emit).not.toHaveBeenCalled();
+    expect(resolveKey).not.toHaveBeenCalled();
+
+    hookMock.listeners.get("keydown")?.({ keycode: 0x0058 });
+    hookMock.listeners.get("keyup")?.({ keycode: 0x0058 });
+    expect(resolveKey).toHaveBeenCalledOnce();
+    expect(resolveKey).toHaveBeenCalledWith(0x0058);
+    expect(emit.mock.calls).toEqual([
+      [expect.objectContaining({ type: "key", phase: "down", pressId: 1 })],
+      [expect.objectContaining({ type: "key", phase: "up", pressId: 1 })]
+    ]);
+
+    hook.dispose();
+  });
+
   it("ignores operating-system key repeat and unmatched key-up events", () => {
     const emit = vi.fn();
     const resolveKey = vi.fn(() => ({

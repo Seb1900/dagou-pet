@@ -6,6 +6,13 @@
 
 暂无。
 
+## [0.3.1] - 2026-07-23
+
+### 修复
+
+- 普通键盘输入只接受设置界面明确支持的按键，忽略 `F13-F24` 等隐藏宏键。
+- 其他桌宠交互和声音行为保持不变。
+
 ## [0.3.0] - 2026-07-23
 
 ### 调整
@@ -44,6 +51,7 @@
 - 改善声音延音、松键收尾、状态渐变和多显示器置顶行为。
 - 系统偶尔漏发松键事件时，根据物理按键状态自动结束持续音，同时保留正常无限长按和自然尾音。
 
-[未发布]: https://github.com/Seb1900/dagou-pet/compare/v0.3.0...HEAD
+[未发布]: https://github.com/Seb1900/dagou-pet/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/Seb1900/dagou-pet/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Seb1900/dagou-pet/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Seb1900/dagou-pet/releases/tag/v0.2.0

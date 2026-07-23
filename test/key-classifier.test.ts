@@ -5,6 +5,7 @@ import {
   MELODY_PITCH_STEPS,
   PHYSICAL_KEYS,
   describeKeyCode,
+  isSupportedKeyCode,
   keyCodeFromDomCode,
   resolveKeyExpression
 } from "../src/shared/key-classifier";
@@ -20,7 +21,7 @@ describe("physical key mapping", () => {
       KEY_CODES.delete,
       KEY_CODES.numpadDelete
     ]) {
-      expect(resolveKeyExpression(keyCode, DEFAULT_JIAO_KEY_CODES, true).role).toBe(
+      expect(resolveKeyExpression(keyCode, DEFAULT_JIAO_KEY_CODES, true)!.role).toBe(
         "jiao"
       );
     }
@@ -29,7 +30,7 @@ describe("physical key mapping", () => {
   it("supports custom jiao keys without exposing typed characters", () => {
     const a = keyCodeFromDomCode("KeyA");
     expect(a).not.toBeNull();
-    expect(resolveKeyExpression(a!, [a!], true).role).toBe("jiao");
+    expect(resolveKeyExpression(a!, [a!], true)!.role).toBe("jiao");
     expect(describeKeyCode(a!)).toBe("A");
   });
 
@@ -37,15 +38,15 @@ describe("physical key mapping", () => {
     const left = resolveKeyExpression(keyCodeFromDomCode("KeyA")!, [], true);
     const middle = resolveKeyExpression(keyCodeFromDomCode("KeyG")!, [], true);
     const right = resolveKeyExpression(keyCodeFromDomCode("Enter")!, [], true);
-    expect(left.pitchStep).toBeLessThan(middle.pitchStep);
-    expect(middle.pitchStep).toBeLessThan(right.pitchStep);
-    expect(left.pan).toBeLessThan(right.pan);
+    expect(left!.pitchStep).toBeLessThan(middle!.pitchStep);
+    expect(middle!.pitchStep).toBeLessThan(right!.pitchStep);
+    expect(left!.pan).toBeLessThan(right!.pan);
   });
 
   it("exposes eight restrained pitch positions across the keyboard", () => {
     const pitches = new Set(
       PHYSICAL_KEYS.map((key) =>
-        resolveKeyExpression(key.keyCode, [], true).pitchStep
+        resolveKeyExpression(key.keyCode, [], true)!.pitchStep
       )
     );
 
@@ -58,5 +59,26 @@ describe("physical key mapping", () => {
   it("can disable the pitch map while preserving roles", () => {
     const expression = resolveKeyExpression(KEY_CODES.space, DEFAULT_JIAO_KEY_CODES, false);
     expect(expression).toMatchObject({ role: "jiao", pitchStep: 0 });
+  });
+
+  it("rejects keys that are not shown in the keyboard settings", () => {
+    const hiddenFunctionKeys = [
+      0x005b,
+      0x005c,
+      0x005d,
+      ...Array.from({ length: 9 }, (_, index) => 0x0063 + index)
+    ];
+
+    for (const keyCode of hiddenFunctionKeys) {
+      expect(isSupportedKeyCode(keyCode)).toBe(false);
+      expect(resolveKeyExpression(keyCode, [], true)).toBeNull();
+    }
+    for (const key of PHYSICAL_KEYS) {
+      expect(isSupportedKeyCode(key.keyCode)).toBe(true);
+    }
+    expect(keyCodeFromDomCode("F13")).toBeNull();
+    expect(isSupportedKeyCode(keyCodeFromDomCode("F12")!)).toBe(true);
+    expect(isSupportedKeyCode(KEY_CODES.numpadDelete)).toBe(true);
+    expect(isSupportedKeyCode(0xe020)).toBe(false);
   });
 });

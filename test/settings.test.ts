@@ -47,7 +47,7 @@ describe("normalizeSettings", () => {
   it("normalizes sound mode and jiao keys", () => {
     const settings = normalizeSettings({
       soundMode: "da-gou",
-      jiaoKeyCodes: [1, 2, 2, -1, "3"]
+      jiaoKeyCodes: [1, 2, 2, 0x005b, 0x006b, -1, "3"]
     });
     expect(settings.soundMode).toBe("da-gou");
     expect(settings.jiaoKeyCodes).toEqual([1, 2]);

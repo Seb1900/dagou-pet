@@ -215,18 +215,25 @@ export function keyCodeFromDomCode(code: string): number | null {
   return byCode.get(code)?.keyCode ?? null;
 }
 
+export function isSupportedKeyCode(keyCode: number): boolean {
+  return byKeyCode.has(keyCode) ||
+    byKeyCode.has(keyCodeAliases.get(keyCode) ?? -1);
+}
+
 export function resolveKeyExpression(
   keyCode: number,
   jiaoKeyCodes: readonly number[],
   applyPitchMap: boolean
-): KeyExpression {
+): KeyExpression | null {
   const key = byKeyCode.get(keyCode) ?? byKeyCode.get(keyCodeAliases.get(keyCode) ?? -1);
-  const width = key ? zoneWidth(key.zone) : 1;
-  const xCenter = key ? key.x + key.width / 2 : width / 2;
+  if (!key) return null;
+  const width = zoneWidth(key.zone);
+  const xCenter = key.x + key.width / 2;
   const xNormalized = Math.min(1, Math.max(0, xCenter / width));
-  const yNormalized = key
-    ? Math.min(1, Math.max(0, (key.height - 1 - key.y) / Math.max(1, key.height - 1)))
-    : 0.5;
+  const yNormalized = Math.min(
+    1,
+    Math.max(0, (key.height - 1 - key.y) / Math.max(1, key.height - 1))
+  );
   const gradient = 0.85 * xNormalized + 0.15 * yNormalized;
   const index = Math.min(
     MELODY_PITCH_STEPS.length - 1,

@@ -1,4 +1,7 @@
-import { DEFAULT_JIAO_KEY_CODES } from "./key-classifier";
+import {
+  DEFAULT_JIAO_KEY_CODES,
+  isSupportedKeyCode
+} from "./key-classifier";
 
 export type SoundMode = "alternate" | "da-gou";
 export type PlaybackMode = "groove" | "instant";
@@ -100,7 +103,8 @@ function keyCodesOr(value: unknown): readonly number[] {
           typeof item === "number" &&
           Number.isInteger(item) &&
           item >= 0 &&
-          item <= 0xffff
+          item <= 0xffff &&
+          isSupportedKeyCode(item)
       )
     )
   ].slice(0, 64);

@@ -3,7 +3,10 @@ import type {
   DogInputEvent,
   DogKeyInputEvent
 } from "../shared/contracts";
-import type { KeyExpression } from "../shared/key-classifier";
+import {
+  isSupportedKeyCode,
+  type KeyExpression
+} from "../shared/key-classifier";
 import type { PhysicalKeyStateProbe } from "./windows-key-state";
 
 interface ActivePress extends KeyExpression {
@@ -20,7 +23,7 @@ export class KeyboardHook {
 
   constructor(
     private readonly emit: (event: DogInputEvent) => void,
-    private readonly resolveKey: (keyCode: number) => KeyExpression,
+    private readonly resolveKey: (keyCode: number) => KeyExpression | null,
     private readonly probePhysicalKey: PhysicalKeyStateProbe | null = null
   ) {
     uIOhook.on("keydown", this.onKeyDown);
@@ -66,10 +69,13 @@ export class KeyboardHook {
 
   private readonly onKeyDown = (event: UiohookKeyboardEvent): void => {
     if (!this.running) return;
+    if (!isSupportedKeyCode(event.keycode)) return;
     if (this.activePresses.has(event.keycode)) return;
+    const expression = this.resolveKey(event.keycode);
+    if (!expression) return;
     const active: ActivePress = {
       pressId: this.nextPressId++,
-      ...this.resolveKey(event.keycode)
+      ...expression
     };
     this.activePresses.set(event.keycode, active);
     this.startPhysicalKeyPolling();
