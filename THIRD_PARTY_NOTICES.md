@@ -7,6 +7,7 @@
 | Electron、Chromium、Node.js | 桌面运行环境 | MIT、BSD 及各上游组件许可证 |
 | electron-updater 及 builder-util-runtime | GitHub Release 更新 | MIT |
 | uiohook-napi、libuiohook | Windows 全局按键事件 | MIT |
+| Koffi | Windows 物理按键状态读取 | MIT |
 | node-gyp-build | 原生模块加载 | MIT |
 | fs-extra、jsonfile、universalify | 更新文件处理 | MIT |
 | js-yaml、argparse | 更新清单解析 | MIT、Python-2.0 |

@@ -12,6 +12,7 @@ interface TestProcessor {
     released: boolean;
     releasePending: boolean;
     forcedFadeRemaining: number;
+    sustainRendered: number;
     currentRate: number;
     targetRate: number;
     groupId: string | null;
@@ -126,7 +127,6 @@ describe("DagouSustainProcessor", () => {
     processor.handleMessage({
       type: "note-off",
       pressId: 1,
-      release: "tail",
       followUp: {
         pressId: -1,
         spec: { ...da, sample: "gou" }
@@ -318,8 +318,7 @@ describe("DagouSustainProcessor", () => {
     });
     processor.handleMessage({
       type: "release-group",
-      groupId: "pending-held",
-      release: "tail"
+      groupId: "pending-held"
     });
 
     expect(processor.pendingGroups.get("pending-held")?.held).toBe(false);
@@ -373,8 +372,7 @@ describe("DagouSustainProcessor", () => {
 
     processor.handleMessage({
       type: "release-group",
-      groupId: "started-held",
-      release: "tail"
+      groupId: "started-held"
     });
     expect(
       [...processor.voices.values()].every(
@@ -505,7 +503,6 @@ describe("DagouSustainProcessor", () => {
     processor.handleMessage({
       type: "note-off",
       pressId: 1,
-      release: "tail",
       followUp: {
         pressId: -1,
         spec: { ...daSpec, sample: "gou" }
@@ -525,7 +522,7 @@ describe("DagouSustainProcessor", () => {
     ).toBe(true);
   });
 
-  it("holds one attack indefinitely and continues through its natural tail", () => {
+  it("holds one attack until release and continues through its natural tail", () => {
     const Processor = loadProcessor();
     const processor = new Processor();
     processor.handleMessage({
@@ -557,7 +554,7 @@ describe("DagouSustainProcessor", () => {
     expect(energy).toBeGreaterThan(1);
     expect(processor.voices.has(1)).toBe(true);
 
-    processor.handleMessage({ type: "note-off", pressId: 1, release: "tail" });
+    processor.handleMessage({ type: "note-off", pressId: 1 });
     const releasedVoice = processor.voices.get(1)!;
     expect(releasedVoice.releasePending).toBe(true);
     expect(releasedVoice.forcedFadeRemaining).toBe(0);
@@ -573,7 +570,7 @@ describe("DagouSustainProcessor", () => {
     expect(processor.voices.has(1)).toBe(false);
   });
 
-  it("smoothly accepts live jiao pitch changes and forced release", () => {
+  it("does not guess key state or truncate a long hold", () => {
     const Processor = loadProcessor();
     const processor = new Processor();
     processor.handleMessage({
@@ -587,24 +584,33 @@ describe("DagouSustainProcessor", () => {
     });
     processor.handleMessage({
       type: "note-on",
-      pressId: 2,
+      pressId: 9,
       spec: {
-        sample: "jiao",
-        role: "jiao",
-        pitchSemitones: 2,
-        gain: 0.6,
-        pan: 0.2
+        sample: "da",
+        role: "normal",
+        pitchSemitones: 0,
+        gain: 0.8,
+        pan: 0
       }
     });
     renderBlock(processor);
+    const voice = processor.voices.get(9)!;
+    expect(voice.state).toBe("sustain");
+
+    voice.sustainRendered = 120_000;
     renderBlock(processor);
-    processor.handleMessage({ type: "jiao-pitch", semitones: 4 });
-    processor.handleMessage({ type: "note-off", pressId: 2, release: "fade" });
-    renderBlock(processor);
-    expect(processor.voices.has(2)).toBe(false);
+
+    expect(voice.held).toBe(true);
+    expect(voice.released).toBe(false);
+    expect(voice.forcedFadeRemaining).toBe(0);
+    processor.handleMessage({ type: "note-off", pressId: 9 });
+    for (let index = 0; index < 4 && processor.voices.has(9); index += 1) {
+      renderBlock(processor);
+    }
+    expect(processor.voices.has(9)).toBe(false);
   });
 
-  it("freezes jiao pitch and reconnects its natural tail on release", () => {
+  it("freezes jiao vibrato and reconnects its natural tail on release", () => {
     const Processor = loadProcessor();
     const processor = new Processor();
     processor.handleMessage({
@@ -628,17 +634,12 @@ describe("DagouSustainProcessor", () => {
       }
     });
     for (let index = 0; index < 10; index += 1) renderBlock(processor);
-    processor.handleMessage({ type: "jiao-pitch", semitones: 3 });
-    renderBlock(processor);
     const voice = processor.voices.get(3)!;
-    expect(voice.currentRate).toBeGreaterThan(1.15);
 
-    processor.handleMessage({ type: "note-off", pressId: 3, release: "tail" });
+    processor.handleMessage({ type: "note-off", pressId: 3 });
     const frozenRate = voice.currentRate;
     expect(voice.releasePending).toBe(true);
     expect(voice.forcedFadeRemaining).toBe(0);
-    expect(voice.targetRate).toBe(frozenRate);
-    processor.handleMessage({ type: "jiao-pitch", semitones: -4 });
     expect(voice.targetRate).toBe(frozenRate);
 
     const firstTailBlock = renderBlock(processor);
@@ -676,7 +677,6 @@ describe("DagouSustainProcessor", () => {
     processor.handleMessage({
       type: "note-off",
       pressId: 4,
-      release: "tail",
       followUp: {
         pressId: -4,
         spec: { ...daSpec, sample: "gou" }

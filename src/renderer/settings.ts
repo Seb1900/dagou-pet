@@ -6,6 +6,8 @@ import {
   PET_SCALE_MIN,
   REACTION_INTENSITY_MAX,
   REACTION_INTENSITY_MIN,
+  volumeGainToPercent,
+  volumePercentToGain,
   type AppSettings,
   type SoundMode
 } from "../shared/settings";
@@ -53,6 +55,11 @@ const captureState = requireElement<HTMLElement>("#capture-state");
 const updateStatus = requireElement<HTMLElement>("#update-status");
 const updateDetail = requireElement<HTMLElement>("#update-detail");
 const updateAction = requireElement<HTMLButtonElement>("#update-action");
+const resetSettingsButton = requireElement<HTMLButtonElement>("#reset-settings");
+const resetDialog = requireElement<HTMLDialogElement>("#reset-dialog");
+const resetError = requireElement<HTMLElement>("#reset-error");
+const confirmReset = requireElement<HTMLButtonElement>("#confirm-reset");
+const cancelReset = requireElement<HTMLButtonElement>("#cancel-reset");
 const documentDialog = requireElement<HTMLDialogElement>("#document-dialog");
 const documentBody = requireElement<HTMLElement>("#document-body");
 const closeDocument = requireElement<HTMLButtonElement>("#close-document");
@@ -60,7 +67,9 @@ const closeDocument = requireElement<HTMLButtonElement>("#close-document");
 let settings: AppSettings | null = null;
 let updateState: UpdateState | null = null;
 let capturing = false;
+let resetting = false;
 let saveSequence = 0;
+let resetFeedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
 petScale.min = String(PET_SCALE_MIN * 100);
 petScale.max = String(PET_SCALE_MAX * 100);
@@ -70,6 +79,7 @@ grooveBpm.min = String(GROOVE_BPM_MIN);
 grooveBpm.max = String(GROOVE_BPM_MAX);
 
 function selectTab(tab: SettingsTab): void {
+  if (tab !== "sound") setCapturing(false);
   for (const button of tabButtons) {
     const selected = button.dataset.tab === tab;
     button.classList.toggle("is-active", selected);
@@ -90,7 +100,7 @@ function render(): void {
   dogMelody.checked = settings.playbackMode === "groove";
   grooveTempoRow.hidden = !dogMelody.checked;
   for (const input of modeInputs) input.checked = input.value === settings.soundMode;
-  volume.value = String(Math.round(settings.volume * 100));
+  volume.value = String(Math.round(volumeGainToPercent(settings.volume)));
   volumeValue.textContent = `${volume.value}%`;
   petScale.value = String(Math.round(settings.scale * 100));
   petScaleValue.textContent = `${petScale.value}%`;
@@ -241,7 +251,7 @@ volume.addEventListener("input", () => {
   volumeValue.textContent = `${volume.value}%`;
 });
 volume.addEventListener("change", () => {
-  void persist({ volume: Number(volume.value) / 100, muted: false });
+  void persist({ volume: volumePercentToGain(Number(volume.value)) });
 });
 petScale.addEventListener("input", () => {
   petScaleValue.textContent = `${petScale.value}%`;
@@ -281,6 +291,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-externa
 requireElement<HTMLButtonElement>("[data-document=privacy]").addEventListener(
   "click",
   () => {
+    setCapturing(false);
     documentBody.textContent = privacyDocument;
     documentBody.scrollTop = 0;
     documentDialog.showModal();
@@ -310,9 +321,52 @@ updateAction.addEventListener("click", async () => {
   }
 });
 
+resetSettingsButton.addEventListener("click", () => {
+  setCapturing(false);
+  resetError.textContent = "";
+  resetDialog.showModal();
+});
+
+confirmReset.addEventListener("click", async () => {
+  if (resetting) return;
+  const sequence = ++saveSequence;
+  resetting = true;
+  confirmReset.disabled = true;
+  cancelReset.disabled = true;
+  resetError.textContent = "";
+  try {
+    const restored = await window.dagou.resetSettings();
+    if (sequence === saveSequence) {
+      settings = restored;
+      render();
+    }
+    resetDialog.close();
+    if (resetFeedbackTimer) clearTimeout(resetFeedbackTimer);
+    resetSettingsButton.textContent = "已恢复";
+    resetFeedbackTimer = setTimeout(() => {
+      resetSettingsButton.textContent = "恢复默认";
+      resetFeedbackTimer = null;
+    }, 1_500);
+  } catch (error: unknown) {
+    resetError.textContent = error instanceof Error
+      ? error.message
+      : "恢复失败";
+  } finally {
+    resetting = false;
+    confirmReset.disabled = false;
+    cancelReset.disabled = false;
+  }
+});
+
 closeDocument.addEventListener("click", () => documentDialog.close());
 documentDialog.addEventListener("click", (event) => {
   if (event.target === documentDialog) documentDialog.close();
+});
+resetDialog.addEventListener("click", (event) => {
+  if (!resetting && event.target === resetDialog) resetDialog.close();
+});
+resetDialog.addEventListener("cancel", (event) => {
+  if (resetting) event.preventDefault();
 });
 
 window.addEventListener("keydown", (event) => {

@@ -3,6 +3,7 @@ import {
   centeredRectangleByArea,
   constrainWindowPositionToWorkArea,
   positionFromDragPointer,
+  positionWindowAboveRectangle,
   resizeSquareFromAnchor,
   scaleFromResizePointer,
   shouldIgnorePetMouseEvents
@@ -167,6 +168,43 @@ describe("scaleFromResizePointer", () => {
       flipHorizontal: false,
       flipVertical: false
     })).toBe(5);
+  });
+});
+
+describe("positionWindowAboveRectangle", () => {
+  const panel = { width: 330, height: 450 };
+  const workArea = { x: 0, y: 0, width: 1_920, height: 1_040 };
+
+  it("centers the panel with its bottom touching the interactive area", () => {
+    const anchor = { x: 800, y: 600, width: 200, height: 180 };
+    const position = positionWindowAboveRectangle(anchor, panel, workArea);
+
+    expect(position).toEqual({ x: 735, y: 150 });
+    expect(position.x + panel.width / 2).toBe(
+      anchor.x + anchor.width / 2
+    );
+    expect(position.y + panel.height).toBe(anchor.y);
+  });
+
+  it("keeps the full panel inside the selected display work area", () => {
+    expect(positionWindowAboveRectangle(
+      { x: -80, y: 120, width: 100, height: 100 },
+      panel,
+      workArea
+    )).toEqual({ x: 0, y: 0 });
+    expect(positionWindowAboveRectangle(
+      { x: 1_850, y: 900, width: 100, height: 100 },
+      panel,
+      workArea
+    )).toEqual({ x: 1_590, y: 450 });
+  });
+
+  it("supports work areas with negative screen coordinates", () => {
+    expect(positionWindowAboveRectangle(
+      { x: -900, y: 700, width: 180, height: 160 },
+      panel,
+      { x: -1_280, y: 0, width: 1_280, height: 1_024 }
+    )).toEqual({ x: -975, y: 250 });
   });
 });
 

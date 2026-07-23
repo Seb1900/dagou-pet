@@ -1,4 +1,4 @@
-export type UpdatePhase =
+type UpdatePhase =
   | "disabled"
   | "manual"
   | "idle"
@@ -14,19 +14,7 @@ export interface UpdateState {
   currentVersion: string;
   availableVersion: string | null;
   percent: number | null;
-  bytesPerSecond: number | null;
   message: string;
-}
-
-export interface AppInfo {
-  name: string;
-  version: string;
-  author: string;
-  copyright: string;
-  electronVersion: string;
-  buildCommit: string | null;
-  updateMode: "installed" | "manual" | "disabled";
-  settingsNotice: string | null;
 }
 
 export type ExternalTarget = "project" | "feedback" | "releases";

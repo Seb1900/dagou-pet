@@ -3,7 +3,7 @@ name: Release Windows
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v*.*.*"
 
 permissions:
   contents: write
@@ -45,10 +45,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
       - name: Build Windows packages
-        shell: pwsh
-        run: |
-          npm pkg set buildCommit=$env:GITHUB_SHA
-          npx electron-builder --win --publish never
+        run: npx electron-builder --win --publish never
 
       - name: Write checksums
         run: node scripts/write-checksums.cjs

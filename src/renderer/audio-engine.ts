@@ -2,6 +2,7 @@ import {
   AUDIO_SAMPLE_NAMES,
   type AudioSampleName
 } from "../shared/contracts";
+import { DEFAULT_SETTINGS, VOLUME_MAX } from "../shared/settings";
 import {
   SUSTAIN_PROFILES,
   type VoiceSpec
@@ -19,8 +20,7 @@ export class AudioEngine {
   private master: GainNode | null = null;
   private compressor: DynamicsCompressorNode | null = null;
   private worklet: AudioWorkletNode | null = null;
-  private volume = 0.72;
-  private muted = false;
+  private volume = DEFAULT_SETTINGS.volume;
   private oneShotId = -1;
 
   async initialize(
@@ -66,12 +66,7 @@ export class AudioEngine {
   }
 
   setVolume(value: number): void {
-    this.volume = Math.min(1, Math.max(0, value));
-    this.applyMasterGain();
-  }
-
-  setMuted(value: boolean): void {
-    this.muted = value;
+    this.volume = Math.min(VOLUME_MAX, Math.max(0, value));
     this.applyMasterGain();
   }
 
@@ -80,12 +75,8 @@ export class AudioEngine {
     this.post({ type: "note-on", pressId, spec });
   }
 
-  noteOff(
-    pressId: number,
-    release: "tail" | "fade",
-    followUp?: VoiceSpec
-  ): void {
-    const message: WorkletMessage = { type: "note-off", pressId, release };
+  noteOff(pressId: number, followUp?: VoiceSpec): void {
+    const message: WorkletMessage = { type: "note-off", pressId };
     if (followUp) {
       message.followUp = { pressId: this.oneShotId--, spec: followUp };
     }
@@ -122,15 +113,8 @@ export class AudioEngine {
     });
   }
 
-  releaseGroup(
-    groupId: string,
-    release: "tail" | "fade" = "tail"
-  ): void {
-    this.post({ type: "release-group", groupId, release });
-  }
-
-  setJiaoSustainPitch(semitones: number): void {
-    this.post({ type: "jiao-pitch", semitones });
+  releaseGroup(groupId: string): void {
+    this.post({ type: "release-group", groupId });
   }
 
   stopAll(): void {
@@ -172,8 +156,7 @@ export class AudioEngine {
   private applyMasterGain(): void {
     if (!this.context || !this.master) return;
     const now = this.context.currentTime;
-    const target = this.muted ? 0 : this.volume;
     this.master.gain.cancelScheduledValues(now);
-    this.master.gain.setTargetAtTime(target, now, 0.012);
+    this.master.gain.setTargetAtTime(this.volume, now, 0.012);
   }
 }

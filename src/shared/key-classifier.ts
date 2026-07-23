@@ -217,7 +217,7 @@ export function keyCodeFromDomCode(code: string): number | null {
 export function resolveKeyExpression(
   keyCode: number,
   jiaoKeyCodes: readonly number[],
-  melodyEnabled: boolean
+  applyPitchMap: boolean
 ): KeyExpression {
   const key = byKeyCode.get(keyCode) ?? byKeyCode.get(keyCodeAliases.get(keyCode) ?? -1);
   const width = key ? zoneWidth(key.zone) : 1;
@@ -233,7 +233,7 @@ export function resolveKeyExpression(
   );
   return {
     role: jiaoKeyCodes.includes(keyCode) ? "jiao" : "normal",
-    pitchStep: melodyEnabled ? MELODY_PITCH_STEPS[index] : 0,
+    pitchStep: applyPitchMap ? MELODY_PITCH_STEPS[index] : 0,
     pan: (xNormalized * 2 - 1) * 0.22
   };
 }

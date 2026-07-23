@@ -3,6 +3,9 @@ import {
   DEFAULT_SETTINGS,
   GROOVE_BPM_MAX,
   GROOVE_BPM_MIN,
+  VOLUME_MAX,
+  volumeGainToPercent,
+  volumePercentToGain,
   normalizeSettings
 } from "../src/shared/settings";
 
@@ -10,6 +13,8 @@ describe("normalizeSettings", () => {
   it("falls back for invalid input", () => {
     expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);
     expect(normalizeSettings("broken")).toEqual(DEFAULT_SETTINGS);
+    expect(DEFAULT_SETTINGS.volume).toBe(0.8);
+    expect(DEFAULT_SETTINGS.volume / VOLUME_MAX).toBe(0.5);
   });
 
   it("clamps volume and scale", () => {
@@ -23,7 +28,7 @@ describe("normalizeSettings", () => {
       scale: 0.1,
       reactionIntensity: 0
     });
-    expect(high.volume).toBe(1);
+    expect(high.volume).toBe(VOLUME_MAX);
     expect(high.scale).toBe(5);
     expect(high.reactionIntensity).toBe(2);
     expect(low.volume).toBe(0);
@@ -31,17 +36,21 @@ describe("normalizeSettings", () => {
     expect(low.reactionIntensity).toBe(0.5);
   });
 
-  it("normalizes sound mode, jiao keys and pitch controls", () => {
+  it("maps the expanded volume range without changing old gain values", () => {
+    expect(volumeGainToPercent(0.8)).toBe(50);
+    expect(volumePercentToGain(50)).toBe(0.8);
+    expect(volumePercentToGain(100)).toBe(1.6);
+    expect(volumeGainToPercent(5)).toBe(100);
+    expect(volumePercentToGain(-10)).toBe(0);
+  });
+
+  it("normalizes sound mode and jiao keys", () => {
     const settings = normalizeSettings({
       soundMode: "da-gou",
-      jiaoKeyCodes: [1, 2, 2, -1, "3"],
-      melodyEnabled: false,
-      jiaoSustainPitch: 99
+      jiaoKeyCodes: [1, 2, 2, -1, "3"]
     });
     expect(settings.soundMode).toBe("da-gou");
     expect(settings.jiaoKeyCodes).toEqual([1, 2]);
-    expect(settings.melodyEnabled).toBe(false);
-    expect(settings.jiaoSustainPitch).toBe(7);
   });
 
   it("normalizes playback mode and rounds a clamped groove tempo", () => {
@@ -71,7 +80,6 @@ describe("normalizeSettings", () => {
     const settings = normalizeSettings({
       x: 120,
       y: Number.NaN,
-      muted: true,
       listening: false,
       clickThrough: "yes",
       alwaysOnTop: false,
@@ -80,7 +88,6 @@ describe("normalizeSettings", () => {
     });
     expect(settings.x).toBe(120);
     expect(settings.y).toBeNull();
-    expect(settings.muted).toBe(true);
     expect(settings.listening).toBe(false);
     expect(settings.clickThrough).toBe(false);
     expect(settings.alwaysOnTop).toBe(false);

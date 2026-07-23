@@ -1,11 +1,11 @@
 import type {
   AudioSampleName,
   DogInputEvent,
+  PetDragRegion,
   PetMoveRequest
 } from "../shared/contracts";
 import type { AppSettings } from "../shared/settings";
 import type {
-  AppInfo,
   ExternalTarget,
   UpdateState
 } from "../shared/update-contracts";
@@ -15,9 +15,9 @@ declare global {
     dagou: {
       getSettings(): Promise<AppSettings>;
       updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
+      resetSettings(): Promise<AppSettings>;
       resizePet(scale: number): void;
-      openSettings(): void;
-      getAppInfo(): Promise<AppInfo>;
+      openSettings(anchor: PetDragRegion): void;
       openExternal(target: ExternalTarget): Promise<void>;
       getUpdateState(): Promise<UpdateState>;
       checkForUpdates(): Promise<UpdateState>;

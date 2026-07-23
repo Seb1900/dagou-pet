@@ -9,7 +9,19 @@ const artifactNames = [
   `Dagou-Desktop-Pet-Setup-${version}-x64.exe.blockmap`,
   `Dagou-Desktop-Pet-Portable-${version}-x64.exe`,
   "latest.yml"
-].filter((name) => existsSync(join(releaseDirectory, name)));
+];
+const missingArtifactNames = artifactNames.filter(
+  (name) => !existsSync(join(releaseDirectory, name))
+);
+
+if (missingArtifactNames.length > 0) {
+  throw new Error(
+    `Missing required release artifacts:\n${missingArtifactNames
+      .map((name) => `- ${name}`)
+      .join("\n")}`
+  );
+}
+
 const lines = artifactNames.map((name) => {
   const digest = createHash("sha256")
     .update(readFileSync(join(releaseDirectory, name)))

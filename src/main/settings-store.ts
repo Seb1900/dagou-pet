@@ -14,7 +14,7 @@ import {
   type AppSettings
 } from "../shared/settings";
 
-export const SETTINGS_SCHEMA_VERSION = 1;
+const SETTINGS_SCHEMA_VERSION = 1;
 
 interface StoredSettingsV1 {
   schemaVersion: typeof SETTINGS_SCHEMA_VERSION;
@@ -23,7 +23,6 @@ interface StoredSettingsV1 {
 
 interface ReadResult {
   settings: AppSettings;
-  notice: string | null;
   rewrite: boolean;
 }
 
@@ -42,31 +41,23 @@ export class SettingsStore {
   private readonly filePath: string;
   private readonly backupPath: string;
   private settings: AppSettings;
-  private notice: string | null;
 
   constructor(userDataPath: string) {
     this.filePath = join(userDataPath, "settings.json");
     this.backupPath = join(userDataPath, "settings.json.bak");
     const result = this.read();
     this.settings = result.settings;
-    this.notice = result.notice;
     if (result.rewrite) {
       try {
         this.write(result.settings);
       } catch {
-        this.notice = this.notice
-          ? `${this.notice}，但暂时无法写回磁盘`
-          : "设置已读取，但暂时无法写回磁盘";
+        // Keep startup usable with the normalized in-memory settings.
       }
     }
   }
 
   get(): AppSettings {
     return { ...this.settings, jiaoKeyCodes: [...this.settings.jiaoKeyCodes] };
-  }
-
-  getNotice(): string | null {
-    return this.notice;
   }
 
   update(patch: Partial<AppSettings>): AppSettings {
@@ -76,9 +67,24 @@ export class SettingsStore {
     return this.get();
   }
 
+  reset(
+    position: Pick<AppSettings, "x" | "y"> = {
+      x: this.settings.x,
+      y: this.settings.y
+    }
+  ): AppSettings {
+    const nextSettings = normalizeSettings({
+      ...cloneDefaults(),
+      ...position
+    });
+    this.write(nextSettings);
+    this.settings = nextSettings;
+    return this.get();
+  }
+
   private read(): ReadResult {
     if (!existsSync(this.filePath)) {
-      return { settings: cloneDefaults(), notice: null, rewrite: true };
+      return { settings: cloneDefaults(), rewrite: true };
     }
     try {
       return this.parseFile(this.filePath);
@@ -89,7 +95,6 @@ export class SettingsStore {
           const recovered = this.parseFile(this.backupPath);
           return {
             settings: recovered.settings,
-            notice: "设置文件损坏，已从备份恢复",
             rewrite: true
           };
         } catch {
@@ -98,7 +103,6 @@ export class SettingsStore {
       }
       return {
         settings: cloneDefaults(),
-        notice: "设置文件损坏，已恢复默认设置",
         rewrite: true
       };
     }
@@ -109,7 +113,6 @@ export class SettingsStore {
     if (isRecord(parsed) && parsed.schemaVersion === SETTINGS_SCHEMA_VERSION) {
       return {
         settings: normalizeSettings(parsed.settings),
-        notice: null,
         rewrite: false
       };
     }
@@ -118,7 +121,6 @@ export class SettingsStore {
     }
     return {
       settings: normalizeSettings(parsed),
-      notice: "设置文件已升级到新版格式",
       rewrite: true
     };
   }

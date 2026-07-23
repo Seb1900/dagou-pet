@@ -21,7 +21,6 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
     this.voices = new Map();
     this.pendingGroups = new Map();
     this.voiceAge = 0;
-    this.jiaoSustainPitch = 0;
     this.frameCursor = typeof currentFrame === "number" ? currentFrame : 0;
     this.port.onmessage = (event) => this.handleMessage(event.data);
   }
@@ -60,22 +59,10 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
         });
         break;
       case "note-off":
-        this.releaseVoice(message.pressId, message.release, message.followUp);
+        this.releaseVoice(message.pressId, "tail", message.followUp);
         break;
       case "release-group":
-        this.releaseGroup(message.groupId, message.release);
-        break;
-      case "jiao-pitch":
-        this.jiaoSustainPitch = clamp(Number(message.semitones) || 0, -7, 7);
-        for (const voice of this.voices.values()) {
-          if (
-            voice.spec.sample === "jiao" &&
-            voice.state === "sustain" &&
-            !voice.releasePending
-          ) {
-            voice.targetRate = voice.baseRate * pitchRate(this.jiaoSustainPitch);
-          }
-        }
+        this.releaseGroup(message.groupId);
         break;
       case "stop-all":
         this.pendingGroups.clear();
@@ -144,7 +131,7 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
     }
   }
 
-  releaseGroup(groupId, release = "tail") {
+  releaseGroup(groupId) {
     const pending = this.pendingGroups.get(groupId);
     if (pending) {
       pending.held = false;
@@ -152,7 +139,7 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
     }
     for (const voice of this.voices.values()) {
       if (voice.groupId === groupId) {
-        this.releaseVoice(voice.id, release);
+        this.releaseVoice(voice.id, "tail");
       }
     }
   }
@@ -235,9 +222,6 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
       ) {
         voice.state = "sustain";
         voice.hasSustained = true;
-        if (voice.spec.sample === "jiao") {
-          voice.targetRate = voice.baseRate * pitchRate(this.jiaoSustainPitch);
-        }
       }
     } else if (voice.state === "sustain") {
       value = this.renderLoop(voice);
@@ -248,7 +232,6 @@ class DagouSustainProcessor extends AudioWorkletProcessor {
             JIAO_VIBRATO_SEMITONES
           : 0;
         const sustainRate = voice.baseRate * pitchRate(
-          (voice.spec.sample === "jiao" ? this.jiaoSustainPitch : 0) +
           vibratoSemitones
         );
         voice.targetRate = sustainRate;

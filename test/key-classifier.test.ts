@@ -54,7 +54,7 @@ describe("physical key mapping", () => {
     expect(Math.max(...MELODY_PITCH_STEPS)).toBeLessThanOrEqual(5);
   });
 
-  it("can disable regional melody while preserving roles", () => {
+  it("can disable the pitch map while preserving roles", () => {
     const expression = resolveKeyExpression(KEY_CODES.space, DEFAULT_JIAO_KEY_CODES, false);
     expect(expression).toMatchObject({ role: "jiao", pitchStep: 0 });
   });

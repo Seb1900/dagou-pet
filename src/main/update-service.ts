@@ -6,7 +6,6 @@ interface UpdateInfoLike {
 
 interface ProgressInfoLike {
   percent: number;
-  bytesPerSecond: number;
 }
 
 export interface UpdaterAdapter {
@@ -20,7 +19,6 @@ export interface UpdaterAdapter {
   on(event: "update-available", listener: (info: UpdateInfoLike) => void): this;
   on(event: "download-progress", listener: (info: ProgressInfoLike) => void): this;
   on(event: "update-downloaded", listener: (info: UpdateInfoLike) => void): this;
-  on(event: "update-cancelled", listener: () => void): this;
   on(event: "error", listener: (error: Error) => void): this;
   checkForUpdates(): Promise<unknown>;
   downloadUpdate(): Promise<unknown>;
@@ -63,7 +61,6 @@ export class UpdateService {
       phase: "checking",
       availableVersion: null,
       percent: null,
-      bytesPerSecond: null,
       message: "正在检查更新"
     });
     try {
@@ -81,7 +78,6 @@ export class UpdateService {
     this.setState({
       phase: "downloading",
       percent: 0,
-      bytesPerSecond: 0,
       message: "正在下载更新"
     });
     try {
@@ -104,7 +100,6 @@ export class UpdateService {
         currentVersion,
         availableVersion: null,
         percent: null,
-        bytesPerSecond: null,
         message: "开发版不检查更新"
       };
     }
@@ -114,7 +109,6 @@ export class UpdateService {
         currentVersion,
         availableVersion: null,
         percent: null,
-        bytesPerSecond: null,
         message: "免安装版手动下载更新"
       };
     }
@@ -123,7 +117,6 @@ export class UpdateService {
       currentVersion,
       availableVersion: null,
       percent: null,
-      bytesPerSecond: null,
       message: "尚未检查更新"
     };
   }
@@ -142,7 +135,6 @@ export class UpdateService {
         phase: "up-to-date",
         availableVersion: null,
         percent: null,
-        bytesPerSecond: null,
         message: "当前已是新版"
       });
     });
@@ -151,7 +143,6 @@ export class UpdateService {
         phase: "available",
         availableVersion: info.version,
         percent: null,
-        bytesPerSecond: null,
         message: `发现版本 ${info.version}`
       });
     });
@@ -160,7 +151,6 @@ export class UpdateService {
       this.setState({
         phase: "downloading",
         percent,
-        bytesPerSecond: Math.max(0, info.bytesPerSecond),
         message: `正在下载 ${Math.round(percent)}%`
       });
     });
@@ -169,16 +159,7 @@ export class UpdateService {
         phase: "downloaded",
         availableVersion: info.version,
         percent: 100,
-        bytesPerSecond: 0,
         message: "更新已下载，重启后安装"
-      });
-    });
-    updater.on("update-cancelled", () => {
-      this.setState({
-        phase: "available",
-        percent: null,
-        bytesPerSecond: null,
-        message: "更新下载已取消"
       });
     });
     updater.on("error", (error) => this.fail(error));
@@ -190,7 +171,6 @@ export class UpdateService {
     this.setState({
       phase: "error",
       percent: null,
-      bytesPerSecond: null,
       message: `更新失败：${message}`
     });
   }

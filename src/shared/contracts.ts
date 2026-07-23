@@ -1,9 +1,9 @@
 export const IPC_CHANNELS = {
   getSettings: "dagou:get-settings",
   updateSettings: "dagou:update-settings",
+  resetSettings: "dagou:reset-settings",
   resizePet: "dagou:resize-pet",
   openSettings: "dagou:open-settings",
-  getAppInfo: "dagou:get-app-info",
   openExternal: "dagou:open-external",
   getUpdateState: "dagou:get-update-state",
   checkForUpdates: "dagou:check-for-updates",
@@ -49,14 +49,10 @@ export interface DogKeyInputEvent {
   role: DogKeyRole;
   pitchStep: number;
   pan: number;
-  heldCount: number;
-  timestamp: number;
 }
 
-export interface DogResetInputEvent {
+interface DogResetInputEvent {
   type: "reset";
-  heldCount: 0;
-  timestamp: number;
 }
 
 export type DogInputEvent = DogKeyInputEvent | DogResetInputEvent;

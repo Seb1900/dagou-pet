@@ -7,12 +7,12 @@ import { MELODY_PITCH_STEPS } from "../shared/key-classifier";
 import type { AppSettings, SoundMode } from "../shared/settings";
 import { createVoiceSpec, type VoiceSpec } from "./sound-profile";
 
-export const GROOVE_STEPS_PER_BEAT = 2;
+const GROOVE_STEPS_PER_BEAT = 2;
 export const GROOVE_STEPS_PER_BAR = 8;
 export const GROOVE_LOOKAHEAD_MS = 24;
 export const GROOVE_MAX_QUEUED_STEPS = 2;
 export const GROOVE_FIRST_HIT_DELAY_MS = 12;
-export const GROOVE_IDLE_RESET_MS = 3_000;
+const GROOVE_IDLE_RESET_MS = 3_000;
 export const GROOVE_QUANTIZE_TOLERANCE_MS = 0.001;
 
 // Weighted-median YIN anchors for the bundled recordings.
@@ -57,7 +57,7 @@ export interface GrooveOutput {
     startTime: number,
     held?: boolean
   ): void;
-  releaseGroup(groupId: string, release?: "tail" | "fade"): void;
+  releaseGroup(groupId: string): void;
 }
 
 interface GrooveHit {
@@ -302,7 +302,7 @@ export class GroovePlayer {
     const active = this.activePresses.get(input.pressId);
     if (!active) return;
     this.activePresses.delete(input.pressId);
-    if (active.groupId) this.output.releaseGroup(active.groupId, "tail");
+    if (active.groupId) this.output.releaseGroup(active.groupId);
     if (active.input.role === "normal" && this.soundMode === "da-gou") {
       this.queue({
         input: active.input,

@@ -9,12 +9,7 @@ import { createVoiceSpec, type VoiceSpec } from "./sound-profile";
 
 export interface SoundOutput {
   noteOn(pressId: number, spec: VoiceSpec): void;
-  noteOff(
-    pressId: number,
-    release: "tail" | "fade",
-    followUp?: VoiceSpec
-  ): void;
-  playOneShot(spec: VoiceSpec): void;
+  noteOff(pressId: number, followUp?: VoiceSpec): void;
   currentTime(): number;
   scheduleVoices(
     groupId: string,
@@ -22,18 +17,12 @@ export interface SoundOutput {
     startTime: number,
     held?: boolean
   ): void;
-  releaseGroup(groupId: string, release?: "tail" | "fade"): void;
-  setJiaoSustainPitch(semitones: number): void;
+  releaseGroup(groupId: string): void;
   stopAll(): void;
 }
 
-interface ActiveSound {
-  input: DogKeyInputEvent;
-  mode: SoundMode;
-}
-
 export class SoundController {
-  private readonly active = new Map<number, ActiveSound>();
+  private readonly active = new Map<number, DogKeyInputEvent>();
   private mode: SoundMode = "alternate";
   private playbackMode: PlaybackMode = "groove";
   private grooveBpm = 128;
@@ -51,7 +40,7 @@ export class SoundController {
 
   configure(settings: Pick<
     AppSettings,
-    "soundMode" | "jiaoSustainPitch" | "playbackMode" | "grooveBpm"
+    "soundMode" | "playbackMode" | "grooveBpm"
   >): void {
     const playbackChanged = settings.playbackMode !== this.playbackMode;
     const activeGrooveTempoChanged =
@@ -71,7 +60,6 @@ export class SoundController {
     this.grooveBpm = settings.grooveBpm;
     this.groove.configure(settings);
     this.configured = true;
-    this.output.setJiaoSustainPitch(settings.jiaoSustainPitch);
   }
 
   handle(event: DogInputEvent): void {
@@ -102,7 +90,7 @@ export class SoundController {
       : this.mode === "da-gou"
         ? createVoiceSpec("da", event)
         : this.takeAlternateSpec(event);
-    this.active.set(event.pressId, { input: event, mode: this.mode });
+    this.active.set(event.pressId, event);
     this.output.noteOn(event.pressId, spec);
   }
 
@@ -110,14 +98,13 @@ export class SoundController {
     const active = this.active.get(event.pressId);
     if (!active) return;
     this.active.delete(event.pressId);
-    if (active.input.role === "jiao" || active.mode === "alternate") {
-      this.output.noteOff(event.pressId, "tail");
+    if (active.role === "jiao" || this.mode === "alternate") {
+      this.output.noteOff(event.pressId);
       return;
     }
     this.output.noteOff(
       event.pressId,
-      "tail",
-      createVoiceSpec("gou", active.input)
+      createVoiceSpec("gou", active)
     );
   }
 

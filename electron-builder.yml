@@ -15,18 +15,26 @@ electronFuses:
   onlyLoadAppFromAsar: true
 asarUnpack:
   - node_modules/uiohook-napi/prebuilds/**/*.node
+  - node_modules/@koromix/koffi-win32-x64/**/*.node
 files:
   - dist/**/*
   - dist-electron/**/*
   - package.json
   - node_modules/uiohook-napi/**/*
   - node_modules/node-gyp-build/**/*
+  - node_modules/koffi/**/*
+  - node_modules/@koromix/koffi-win32-x64/**/*
   - "!node_modules/uiohook-napi/libuiohook/**/*"
   - "!node_modules/uiohook-napi/src/**/*"
   - "!node_modules/uiohook-napi/prebuilds/darwin-*/**/*"
   - "!node_modules/uiohook-napi/prebuilds/linux-*/**/*"
   - "!node_modules/uiohook-napi/prebuilds/win32-arm64/**/*"
   - "!node_modules/uiohook-napi/binding.gyp"
+  - "!node_modules/koffi/doc/**/*"
+  - "!node_modules/koffi/vendor/**/*"
+  - "!node_modules/koffi/src/cnoke/**/*"
+  - "!node_modules/koffi/src/koffi/src/**/*"
+  - node_modules/koffi/src/koffi/src/static.cjs
 extraResources:
   - from: assets/dagou/sounds
     to: assets/dagou/sounds

@@ -9,8 +9,7 @@ import {
 import {
   SUSTAIN_PROFILES,
   createEiVoiceSpec,
-  createVoiceSpec,
-  pitchRate
+  createVoiceSpec
 } from "../src/renderer/sound-profile";
 
 function wavDurationSeconds(path: string): number {
@@ -85,11 +84,5 @@ describe("sound profiles", () => {
     expect(KEYBOARD_SAMPLE_NAMES).not.toContain("ei");
     expect(AUDIO_SAMPLE_NAMES).toContain("ei");
     expect(SUSTAIN_PROFILES).not.toHaveProperty("ei");
-  });
-
-  it("converts semitone offsets to playback ratios", () => {
-    expect(pitchRate(0)).toBe(1);
-    expect(pitchRate(12)).toBe(2);
-    expect(pitchRate(-12)).toBe(0.5);
   });
 });

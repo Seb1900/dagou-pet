@@ -54,7 +54,3 @@ export function createEiVoiceSpec(): VoiceSpec {
     pan: 0
   };
 }
-
-export function pitchRate(semitones: number): number {
-  return 2 ** (semitones / 12);
-}

@@ -88,11 +88,10 @@ describe("UpdateService", () => {
     expect(updater.downloadUpdate).toHaveBeenCalledOnce();
     expect(service.getState().phase).toBe("downloading");
 
-    updater.emit("download-progress", { percent: 43.6, bytesPerSecond: 2048 });
+    updater.emit("download-progress", { percent: 43.6 });
     expect(service.getState()).toMatchObject({
       phase: "downloading",
-      percent: 43.6,
-      bytesPerSecond: 2048
+      percent: 43.6
     });
 
     updater.emit("update-downloaded", { version: "0.3.0" });

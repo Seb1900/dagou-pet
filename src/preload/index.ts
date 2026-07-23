@@ -2,11 +2,11 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   AudioSampleName,
   DogInputEvent,
+  PetDragRegion,
   PetMoveRequest
 } from "../shared/contracts";
 import type { AppSettings } from "../shared/settings";
 import type {
-  AppInfo,
   ExternalTarget,
   UpdateState
 } from "../shared/update-contracts";
@@ -15,9 +15,9 @@ import type {
 const IPC_CHANNELS = {
   getSettings: "dagou:get-settings",
   updateSettings: "dagou:update-settings",
+  resetSettings: "dagou:reset-settings",
   resizePet: "dagou:resize-pet",
   openSettings: "dagou:open-settings",
-  getAppInfo: "dagou:get-app-info",
   openExternal: "dagou:open-external",
   getUpdateState: "dagou:get-update-state",
   checkForUpdates: "dagou:check-for-updates",
@@ -45,16 +45,18 @@ const api = {
     ) as Promise<AppSettings>;
   },
 
+  resetSettings(): Promise<AppSettings> {
+    return ipcRenderer.invoke(
+      IPC_CHANNELS.resetSettings
+    ) as Promise<AppSettings>;
+  },
+
   resizePet(scale: number): void {
     ipcRenderer.send(IPC_CHANNELS.resizePet, scale);
   },
 
-  openSettings(): void {
-    ipcRenderer.send(IPC_CHANNELS.openSettings);
-  },
-
-  getAppInfo(): Promise<AppInfo> {
-    return ipcRenderer.invoke(IPC_CHANNELS.getAppInfo) as Promise<AppInfo>;
+  openSettings(anchor: PetDragRegion): void {
+    ipcRenderer.send(IPC_CHANNELS.openSettings, anchor);
   },
 
   openExternal(target: ExternalTarget): Promise<void> {

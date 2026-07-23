@@ -32,8 +32,6 @@ function input(
     role: "normal",
     pitchStep: 0,
     pan: 0,
-    heldCount: 1,
-    timestamp: pressId,
     ...overrides
   };
 }
@@ -122,7 +120,7 @@ describe("groove quantization", () => {
     );
   });
 
-  it("queues a short rapid burst into consecutive sixteenth-note slots", () => {
+  it("queues a short rapid burst into consecutive eighth-note slots", () => {
     const { player, scheduleVoices } = setup(2);
     const stepSeconds = grooveStepMilliseconds(128) / 1_000;
 
@@ -302,9 +300,9 @@ describe("groove phrase state", () => {
 
     setNow(4.1);
     player.handle(input(2));
-    player.handle(input(1, { phase: "up", heldCount: 0 }));
+    player.handle(input(1, { phase: "up" }));
 
-    expect(releaseGroup).toHaveBeenCalledWith(firstGroup, "tail");
+    expect(releaseGroup).toHaveBeenCalledWith(firstGroup);
     expect(scheduleVoices).toHaveBeenCalledTimes(3);
     expect(scheduleVoices.mock.calls.at(-1)?.[1][0].sample).toBe("gou");
   });
@@ -317,10 +315,10 @@ describe("groove phrase state", () => {
     player.handle(input(4));
     const replacedGroup = scheduleVoices.mock.calls.at(-1)?.[0] as string;
 
-    player.handle(input(2, { phase: "up", heldCount: 3 }));
-    expect(releaseGroup).not.toHaveBeenCalledWith(replacedGroup, "tail");
+    player.handle(input(2, { phase: "up" }));
+    expect(releaseGroup).not.toHaveBeenCalledWith(replacedGroup);
 
-    player.handle(input(4, { phase: "up", heldCount: 2 }));
-    expect(releaseGroup).toHaveBeenCalledWith(replacedGroup, "tail");
+    player.handle(input(4, { phase: "up" }));
+    expect(releaseGroup).toHaveBeenCalledWith(replacedGroup);
   });
 });

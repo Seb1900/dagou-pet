@@ -11,7 +11,7 @@ import {
   Tray
 } from "electron";
 import { autoUpdater } from "electron-updater";
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
@@ -22,18 +22,19 @@ import type {
 } from "../shared/contracts";
 import { AUDIO_SAMPLE_NAMES, IPC_CHANNELS } from "../shared/contracts";
 import {
+  DEFAULT_SETTINGS,
   normalizeSettings,
   PET_WINDOW_BASE_SIZE,
   type AppSettings
 } from "../shared/settings";
 import type {
-  AppInfo,
   ExternalTarget,
   UpdateState
 } from "../shared/update-contracts";
 import { resolveKeyExpression } from "../shared/key-classifier";
 import {
   constrainWindowPositionToWorkArea,
+  positionWindowAboveRectangle,
   resizeSquareFromAnchor,
   shouldIgnorePetMouseEvents,
   type HorizontalAnchor,
@@ -48,6 +49,10 @@ import {
   type UpdateMode,
   type UpdaterAdapter
 } from "./update-service";
+import {
+  createWindowsKeyStateProbe,
+  type PhysicalKeyStateProbe
+} from "./windows-key-state";
 
 const EDGE_MARGIN = 22;
 const POSITION_SAVE_DELAY_MS = 250;
@@ -65,6 +70,8 @@ if (isSmokeTest) app.disableHardwareAcceleration();
 
 let petWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
+let settingsWindowReady = false;
+let latestSettingsAnchor: WindowRectangle | null = null;
 let tray: Tray | null = null;
 let keyboardHook: KeyboardHook | null = null;
 let keyboardLifecycle: KeyboardLifecycle | null = null;
@@ -81,6 +88,7 @@ let updateCheckTimer: NodeJS.Timeout | null = null;
 let smokeFinished = false;
 let smokePetReady = false;
 let smokeSettingsReady = false;
+let physicalKeyStateProbe: PhysicalKeyStateProbe | null = null;
 
 function writeSmokeResult(
   result: Record<string, unknown>,
@@ -94,13 +102,18 @@ function writeSmokeResult(
 function finishSmokeTestIfReady(): void {
   if (!isSmokeTest || !smokePetReady || !smokeSettingsReady) return;
   writeSmokeResult(
-    { rendererReady: true, settingsReady: true, audioReady: true },
+    {
+      rendererReady: true,
+      settingsReady: true,
+      audioReady: true,
+      keyStateReady: process.platform !== "win32" || physicalKeyStateProbe !== null
+    },
     true
   );
   console.log("DAGOU_SMOKE_READY");
   setImmediate(() => {
     isQuitting = true;
-    app.quit();
+    app.exit(0);
   });
 }
 
@@ -149,11 +162,17 @@ function parsePetMoveRequest(value: unknown): PetMoveRequest | null {
   if (!isRecord(value)) return null;
   const position = parsePetPoint(value.position);
   const pointer = parsePetPoint(value.pointer);
-  if (!position || !pointer || !isRecord(value.dragRegion)) return null;
-  const dragPosition = parsePetPoint(value.dragRegion);
-  const { width, height } = value.dragRegion;
+  const dragRegion = parseWindowRectangle(value.dragRegion);
+  if (!position || !pointer || !dragRegion) return null;
+  return { position, pointer, dragRegion };
+}
+
+function parseWindowRectangle(value: unknown): WindowRectangle | null {
+  if (!isRecord(value)) return null;
+  const position = parsePetPoint(value);
+  const { width, height } = value;
   if (
-    !dragPosition ||
+    !position ||
     typeof width !== "number" ||
     !Number.isFinite(width) ||
     width <= 0 ||
@@ -163,11 +182,7 @@ function parsePetMoveRequest(value: unknown): PetMoveRequest | null {
   ) {
     return null;
   }
-  return {
-    position,
-    pointer,
-    dragRegion: { ...dragPosition, width, height }
-  };
+  return { ...position, width, height };
 }
 
 function clipDragRegionToWindow(
@@ -186,6 +201,25 @@ function clipDragRegionToWindow(
   const bottom = Math.min(windowHeight, unboundedBottom);
   if (right <= x || bottom <= y) return null;
   return { x, y, width: right - x, height: bottom - y };
+}
+
+function settingsAnchorFromPetRegion(value: unknown): WindowRectangle | null {
+  if (!petWindow || petWindow.isDestroyed()) return null;
+  const requested = parseWindowRectangle(value);
+  if (!requested) return null;
+  const contentBounds = petWindow.getContentBounds();
+  const clipped = clipDragRegionToWindow(
+    requested,
+    contentBounds.width,
+    contentBounds.height
+  );
+  if (!clipped) return null;
+  return {
+    x: contentBounds.x + clipped.x,
+    y: contentBounds.y + clipped.y,
+    width: clipped.width,
+    height: clipped.height
+  };
 }
 
 function petWindowSize(): number {
@@ -246,33 +280,6 @@ function currentUpdateMode(): UpdateMode {
   if (!app.isPackaged || isSmokeTest) return "disabled";
   if (process.env.PORTABLE_EXECUTABLE_FILE) return "manual";
   return "installed";
-}
-
-function buildCommit(): string | null {
-  try {
-    const metadata = JSON.parse(
-      readFileSync(join(app.getAppPath(), "package.json"), "utf8")
-    ) as { buildCommit?: unknown };
-    return typeof metadata.buildCommit === "string" &&
-      /^[0-9a-f]{7,40}$/i.test(metadata.buildCommit)
-      ? metadata.buildCommit.slice(0, 12)
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function appInfo(): AppInfo {
-  return {
-    name: "大狗桌宠",
-    version: app.getVersion(),
-    author: "冰冰赚大钱",
-    copyright: "版权所有 © 2026 冰冰赚大钱",
-    electronVersion: process.versions.electron,
-    buildCommit: buildCommit(),
-    updateMode: currentUpdateMode(),
-    settingsNotice: settingsStore?.getNotice() ?? null
-  };
 }
 
 function schedulePositionSave(): void {
@@ -365,15 +372,43 @@ function shortcutLabel(
     : `${label} (快捷键被占用)`;
 }
 
-function updateSettings(patch: Partial<AppSettings>): AppSettings {
-  if (!settingsStore) return settings;
-  settings = settingsStore.update(patch);
+function applyStoredSettings(nextSettings: AppSettings): AppSettings {
+  settings = nextSettings;
   applyWindowSettings();
   if (!settings.listening) syncKeyboardHook();
   broadcastSettings();
   if (settings.listening) syncKeyboardHook();
   rebuildTrayMenu();
   return settings;
+}
+
+function updateSettings(patch: Partial<AppSettings>): AppSettings {
+  if (!settingsStore) return settings;
+  return applyStoredSettings(settingsStore.update(patch));
+}
+
+function resetSettings(): AppSettings {
+  if (!settingsStore) return settings;
+  let position: Pick<AppSettings, "x" | "y"> = {
+    x: settings.x,
+    y: settings.y
+  };
+  if (petWindow && !petWindow.isDestroyed()) {
+    const bounds = petWindow.getBounds();
+    const display = screen.getDisplayNearestPoint({
+      x: bounds.x + bounds.width - 1,
+      y: bounds.y + bounds.height - 1
+    });
+    const resetBounds = resizeSquareFromAnchor(
+      bounds,
+      Math.round(PET_WINDOW_BASE_SIZE * DEFAULT_SETTINGS.scale),
+      display.workArea,
+      "right",
+      "bottom"
+    );
+    position = { x: resetBounds.x, y: resetBounds.y };
+  }
+  return applyStoredSettings(settingsStore.reset(position));
 }
 
 function resetPosition(): void {
@@ -388,7 +423,7 @@ function rebuildTrayMenu(): void {
   if (!tray) return;
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: "设置...", click: showSettingsWindow },
+      { label: "设置...", click: () => showSettingsWindow() },
       { type: "separator" },
       {
         label: "暂停监听",
@@ -428,7 +463,7 @@ function createTray(): void {
   tray = new Tray(icon);
   tray.setToolTip("大狗桌宠");
   rebuildTrayMenu();
-  tray.on("click", showSettingsWindow);
+  tray.on("click", () => showSettingsWindow());
 }
 
 function registerShortcuts(): void {
@@ -531,13 +566,39 @@ function createPetWindow(): BrowserWindow {
   return window;
 }
 
-function showSettingsWindow(): void {
+function positionSettingsWindow(anchor: WindowRectangle): void {
+  if (!settingsWindow || settingsWindow.isDestroyed()) return;
+  const bounds = settingsWindow.getBounds();
+  const left = Math.floor(anchor.x);
+  const top = Math.floor(anchor.y);
+  const right = Math.ceil(anchor.x + anchor.width);
+  const bottom = Math.ceil(anchor.y + anchor.height);
+  const display = screen.getDisplayMatching({
+    x: left,
+    y: top,
+    width: Math.max(1, right - left),
+    height: Math.max(1, bottom - top)
+  });
+  const position = positionWindowAboveRectangle(
+    anchor,
+    { width: bounds.width, height: bounds.height },
+    display.workArea
+  );
+  settingsWindow.setPosition(position.x, position.y, false);
+}
+
+function showSettingsWindow(anchor?: WindowRectangle): void {
+  if (anchor) latestSettingsAnchor = anchor;
   if (settingsWindow && !settingsWindow.isDestroyed()) {
+    if (anchor) positionSettingsWindow(anchor);
+    if (!settingsWindowReady) return;
     settingsWindow.show();
     settingsWindow.focus();
     return;
   }
-  settingsWindow = new BrowserWindow({
+  settingsWindowReady = false;
+  latestSettingsAnchor = anchor ?? null;
+  const window = new BrowserWindow({
     width: 330,
     height: 450,
     title: "大狗桌宠",
@@ -555,28 +616,39 @@ function showSettingsWindow(): void {
       sandbox: true
     }
   });
-  settingsWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  settingsWindow.webContents.on("will-navigate", (event) => event.preventDefault());
+  settingsWindow = window;
+  if (latestSettingsAnchor) positionSettingsWindow(latestSettingsAnchor);
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  window.webContents.on("will-navigate", (event) => event.preventDefault());
   if (isSmokeTest) {
-    settingsWindow.webContents.on("console-message", (_event, _level, message) => {
+    window.webContents.on("console-message", (_event, _level, message) => {
       console.error(`DAGOU_SETTINGS_RENDERER: ${message}`);
     });
-    settingsWindow.webContents.on("did-fail-load", (_event, code, description) => {
+    window.webContents.on("did-fail-load", (_event, code, description) => {
       console.error(`DAGOU_SETTINGS_LOAD_FAILED: ${code} ${description}`);
       writeSmokeResult({ stage: "settings-load-failed", code, error: description });
     });
-    settingsWindow.webContents.on("did-finish-load", () => {
+    window.webContents.on("did-finish-load", () => {
       writeSmokeResult({ stage: "settings-did-finish-load" });
     });
   }
-  settingsWindow.once("ready-to-show", () => {
-    if (!isSmokeTest) settingsWindow?.show();
+  window.once("ready-to-show", () => {
+    if (settingsWindow !== window || window.isDestroyed()) return;
+    settingsWindowReady = true;
+    if (latestSettingsAnchor) positionSettingsWindow(latestSettingsAnchor);
+    if (!isSmokeTest) {
+      window.show();
+      window.focus();
+    }
     broadcastSettings();
   });
-  settingsWindow.on("closed", () => {
+  window.on("closed", () => {
+    if (settingsWindow !== window) return;
     settingsWindow = null;
+    settingsWindowReady = false;
+    latestSettingsAnchor = null;
   });
-  void settingsWindow.loadFile(join(app.getAppPath(), "dist", "settings.html"));
+  void window.loadFile(join(app.getAppPath(), "dist", "settings.html"));
 }
 
 function registerIpc(): void {
@@ -584,14 +656,16 @@ function registerIpc(): void {
     if (!isTrustedSender(event.sender)) throw new Error("Invalid settings read");
     return settings;
   });
-  ipcMain.on(IPC_CHANNELS.openSettings, (event) => {
-    if (event.sender === petWindow?.webContents) showSettingsWindow();
-  });
-  ipcMain.handle(IPC_CHANNELS.getAppInfo, (event) => {
+  ipcMain.handle(IPC_CHANNELS.resetSettings, (event) => {
     if (event.sender !== settingsWindow?.webContents) {
-      throw new Error("Invalid app info request");
+      throw new Error("Invalid settings reset");
     }
-    return appInfo();
+    return resetSettings();
+  });
+  ipcMain.on(IPC_CHANNELS.openSettings, (event, requestedRegion: unknown) => {
+    if (event.sender !== petWindow?.webContents) return;
+    const anchor = settingsAnchorFromPetRegion(requestedRegion);
+    if (anchor) showSettingsWindow(anchor);
   });
   ipcMain.handle(
     IPC_CHANNELS.openExternal,
@@ -725,7 +799,7 @@ function registerIpc(): void {
       );
       setImmediate(() => {
         isQuitting = true;
-        app.quit();
+        app.exit(1);
       });
     }
   });
@@ -769,6 +843,19 @@ function registerPowerEvents(): void {
 
 async function startApplication(): Promise<void> {
   writeSmokeResult({ stage: "main-ready" });
+  try {
+    physicalKeyStateProbe = createWindowsKeyStateProbe();
+    if (
+      process.platform === "win32" &&
+      physicalKeyStateProbe?.(0x001e) === null
+    ) {
+      throw new Error("Windows key-state probe could not map a standard key");
+    }
+  } catch (error: unknown) {
+    physicalKeyStateProbe = null;
+    if (isSmokeTest) throw error;
+    console.warn("Physical key-state recovery is unavailable", error);
+  }
   settingsStore = new SettingsStore(app.getPath("userData"));
   settings = settingsStore.get();
   const updateMode = currentUpdateMode();
@@ -793,7 +880,8 @@ async function startApplication(): Promise<void> {
       keyCode,
       settings.jiaoKeyCodes,
       settings.playbackMode === "groove"
-    )
+    ),
+    physicalKeyStateProbe
   );
   keyboardLifecycle = new KeyboardLifecycle(keyboardHook);
   syncKeyboardHook();
@@ -809,6 +897,15 @@ async function startApplication(): Promise<void> {
 
 app.whenReady().then(startApplication).catch((error: unknown) => {
   console.error("Failed to start Dagou Desktop Pet", error);
+  if (isSmokeTest) {
+    writeSmokeResult(
+      { rendererReady: false, audioReady: false, error: String(error) },
+      true
+    );
+    isQuitting = true;
+    app.exit(1);
+    return;
+  }
   app.quit();
 });
 

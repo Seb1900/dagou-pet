@@ -1,11 +1,10 @@
 import { DEFAULT_JIAO_KEY_CODES } from "./key-classifier";
 
-export const SOUND_MODES = ["alternate", "da-gou"] as const;
-export type SoundMode = (typeof SOUND_MODES)[number];
-export const PLAYBACK_MODES = ["groove", "instant"] as const;
-export type PlaybackMode = (typeof PLAYBACK_MODES)[number];
+export type SoundMode = "alternate" | "da-gou";
+export type PlaybackMode = "groove" | "instant";
 export const GROOVE_BPM_MIN = 96;
 export const GROOVE_BPM_MAX = 168;
+export const VOLUME_MAX = 1.6;
 export const PET_WINDOW_BASE_SIZE = 310;
 export const PET_SCALE_MIN = 0.65;
 export const PET_SCALE_MAX = 5;
@@ -14,7 +13,6 @@ export const REACTION_INTENSITY_MAX = 2;
 
 export interface AppSettings {
   volume: number;
-  muted: boolean;
   listening: boolean;
   clickThrough: boolean;
   alwaysOnTop: boolean;
@@ -28,13 +26,20 @@ export interface AppSettings {
   grooveBpm: number;
   soundMode: SoundMode;
   jiaoKeyCodes: readonly number[];
-  melodyEnabled: boolean;
-  jiaoSustainPitch: number;
+}
+
+export function volumeGainToPercent(gain: number): number {
+  if (!Number.isFinite(gain)) return 0;
+  return Math.min(100, Math.max(0, gain / VOLUME_MAX * 100));
+}
+
+export function volumePercentToGain(percent: number): number {
+  if (!Number.isFinite(percent)) return 0;
+  return Math.min(100, Math.max(0, percent)) / 100 * VOLUME_MAX;
 }
 
 export const DEFAULT_SETTINGS: Readonly<AppSettings> = Object.freeze({
-  volume: 0.72,
-  muted: false,
+  volume: 0.8,
   listening: true,
   clickThrough: false,
   alwaysOnTop: true,
@@ -47,9 +52,7 @@ export const DEFAULT_SETTINGS: Readonly<AppSettings> = Object.freeze({
   playbackMode: "groove",
   grooveBpm: 128,
   soundMode: "alternate",
-  jiaoKeyCodes: DEFAULT_JIAO_KEY_CODES,
-  melodyEnabled: true,
-  jiaoSustainPitch: 0
+  jiaoKeyCodes: DEFAULT_JIAO_KEY_CODES
 });
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -106,8 +109,12 @@ function keyCodesOr(value: unknown): readonly number[] {
 export function normalizeSettings(value: unknown): AppSettings {
   const source = asRecord(value);
   return {
-    volume: clampNumber(source.volume, DEFAULT_SETTINGS.volume, 0, 1),
-    muted: booleanOr(source.muted, DEFAULT_SETTINGS.muted),
+    volume: clampNumber(
+      source.volume,
+      DEFAULT_SETTINGS.volume,
+      0,
+      VOLUME_MAX
+    ),
     listening: booleanOr(source.listening, DEFAULT_SETTINGS.listening),
     clickThrough: booleanOr(
       source.clickThrough,
@@ -141,16 +148,6 @@ export function normalizeSettings(value: unknown): AppSettings {
       GROOVE_BPM_MAX
     )),
     soundMode: soundModeOr(source.soundMode),
-    jiaoKeyCodes: keyCodesOr(source.jiaoKeyCodes),
-    melodyEnabled: booleanOr(
-      source.melodyEnabled,
-      DEFAULT_SETTINGS.melodyEnabled
-    ),
-    jiaoSustainPitch: clampNumber(
-      source.jiaoSustainPitch,
-      DEFAULT_SETTINGS.jiaoSustainPitch,
-      -7,
-      7
-    )
+    jiaoKeyCodes: keyCodesOr(source.jiaoKeyCodes)
   };
 }

@@ -219,10 +219,6 @@ body {
   filter: grayscale(0.8);
 }
 
-.stage.is-muted .dog {
-  filter: saturate(0.62);
-}
-
 .state-indicator {
   position: absolute;
   right: 11%;
@@ -239,7 +235,6 @@ body {
 }
 
 .stage.is-paused .state-indicator,
-.stage.is-muted .state-indicator,
 .stage.is-click-through .state-indicator {
   opacity: 1;
 }

@@ -269,12 +269,10 @@ function applySettings(nextSettings: AppSettings): void {
   settings = nextSettings;
   if (nextSettings.clickThrough) cancelPointerGestures();
   audio.setVolume(nextSettings.volume);
-  audio.setMuted(false);
   sound.configure(nextSettings);
   animator.setReactionIntensity(nextSettings.reactionIntensity);
   dog.classList.toggle("is-flipped-horizontal", nextSettings.flipHorizontal);
   dog.classList.toggle("is-flipped-vertical", nextSettings.flipVertical);
-  stage.classList.remove("is-muted");
   stage.classList.toggle("is-paused", !nextSettings.listening);
   stage.classList.toggle("is-click-through", nextSettings.clickThrough);
   updatePetMouseInteraction();
@@ -442,7 +440,13 @@ function openSettingsFromContextMenu(event: MouseEvent): void {
   if (settings?.clickThrough) return;
   event.preventDefault();
   event.stopPropagation();
-  window.dagou.openSettings();
+  const hitboxRect = dogHitbox.getBoundingClientRect();
+  window.dagou.openSettings({
+    x: hitboxRect.left,
+    y: hitboxRect.top,
+    width: hitboxRect.width,
+    height: hitboxRect.height
+  });
 }
 
 dogHitbox.addEventListener("pointerenter", () => animator.showShy());

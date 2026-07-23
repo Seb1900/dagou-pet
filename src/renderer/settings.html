@@ -29,6 +29,19 @@
           </div>
 
           <div class="section-block">
+            <label class="toggle-row" for="dog-melody">
+              <span>狗叫旋律</span>
+              <input id="dog-melody" type="checkbox" />
+              <span class="toggle" aria-hidden="true"></span>
+            </label>
+            <label id="groove-tempo-row" class="range-row detail-row" for="groove-bpm">
+              <span>速度</span>
+              <output id="groove-bpm-value" class="value" for="groove-bpm"></output>
+              <input id="groove-bpm" type="range" min="96" max="168" step="4" />
+            </label>
+          </div>
+
+          <div class="section-block">
             <h2>声音模式</h2>
             <p class="field-label">大狗 按键</p>
             <div class="segmented" role="radiogroup" aria-label="大狗按键声音模式">
@@ -54,18 +67,6 @@
             <p id="capture-state" class="capture-state" aria-live="polite"></p>
           </div>
 
-          <div class="section-block">
-            <label class="toggle-row" for="dog-melody">
-              <span>狗叫旋律</span>
-              <input id="dog-melody" type="checkbox" />
-              <span class="toggle" aria-hidden="true"></span>
-            </label>
-            <label id="groove-tempo-row" class="range-row detail-row" for="groove-bpm">
-              <span>速度</span>
-              <output id="groove-bpm-value" class="value" for="groove-bpm"></output>
-              <input id="groove-bpm" type="range" min="96" max="168" step="4" />
-            </label>
-          </div>
         </section>
 
         <section id="pet-panel" class="tab-panel" role="tabpanel" data-panel="pet" hidden>
@@ -111,7 +112,7 @@
             <img class="about-icon" src="../../assets/branding/tray-icon.png" alt="" />
             <div>
               <h2 class="product-name">大狗桌宠</h2>
-              <p class="developer-line">开发者：冰冰赚大钱</p>
+              <p class="developer-line">开发者：Seb1900</p>
             </div>
           </div>
 
@@ -124,6 +125,14 @@
               <p id="update-detail" class="subtle"></p>
             </div>
             <button id="update-action" class="primary-button compact-button" type="button">检查更新</button>
+          </div>
+
+          <div class="reset-block">
+            <div>
+              <strong>恢复默认设置</strong>
+              <p>保留桌宠当前所在位置</p>
+            </div>
+            <button id="reset-settings" class="danger-button compact-button" type="button">恢复默认</button>
           </div>
 
           <div class="link-grid">
@@ -141,6 +150,18 @@
         <button id="close-document" class="icon-button" type="button" aria-label="关闭">×</button>
       </header>
       <pre id="document-body" class="document-body"></pre>
+    </dialog>
+
+    <dialog id="reset-dialog" class="confirm-dialog" aria-labelledby="reset-title">
+      <form method="dialog">
+        <h2 id="reset-title">恢复默认设置？</h2>
+        <p>声音、外观和按键设置将恢复，桌宠位置会保留。</p>
+        <p id="reset-error" class="confirm-error" aria-live="polite"></p>
+        <div class="confirm-actions">
+          <button id="cancel-reset" class="secondary-button" type="submit" value="cancel">取消</button>
+          <button id="confirm-reset" class="danger-button" type="button">恢复默认</button>
+        </div>
+      </form>
     </dialog>
 
     <script type="module" src="./settings.ts"></script>

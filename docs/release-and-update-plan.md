@@ -1,111 +1,69 @@
-# Dagou 正式发布与自动更新计划
+# 正式发布与自动更新
 
-## 发布定位
+本文只记录当前可执行的发布流程和仍需完成的验收，不把规划中的能力描述成现成功能。
 
-Dagou 官方版本免费发布。本项目不建设付费、授权码、账户权益、DRM 或付费内容系统。
+## 发布原则
 
-源码和仓库内素材继续使用 PolyForm Noncommercial License 1.0.0。未经版权方书面许可，第三方不得将项目、修改版或打包程序用于销售、付费分发及其他商业用途。
+- 官方版本通过 [Seb1900/dagou-pet Releases](https://github.com/Seb1900/dagou-pet/releases) 免费发布。
+- 源码和仓库内素材使用 PolyForm Noncommercial License 1.0.0；未经版权方书面许可，不得销售或付费分发。
+- Windows 安装版是普通用户的主要发行形式；免安装版由用户手动下载和替换。
+- 更新流程不收集按键、窗口标题、进程名或输入历史。
 
-## 目标
+## 当前实现
 
-- 提供可验证来源的 Windows 安装版和免安装版。
-- 发布包包含许可证、版权声明和隐私说明。
-- 使用可重复执行的 Tag 发布流程生成安装包、校验值和更新文件。
-- NSIS 安装版支持安全的应用内更新。
-- 免安装版只检查新版本并引导用户手动下载。
-- 更新不收集按键、窗口标题、进程名或输入节奏。
-
-## 当前状态
-
-| 项目 | 状态 |
+| 模块 | 当前状态 |
 | --- | --- |
-| 源码许可证 | PolyForm Noncommercial 1.0.0 |
-| 安装包 | NSIS x64、Portable x64 |
-| 自动测试 | `npm run verify`，98 项测试 |
-| 打包检查 | `npm run smoke:packaged` |
-| 完整性校验 | `SHA256SUMS.txt` |
-| GitHub Actions 发布流程 | 已建立，等待首次 Tag 实跑 |
-| 应用内更新 | 已实现，等待两个真实版本更新验收 |
-| 设置迁移和备份 | 已实现并有自动测试 |
-| 设置与关于页 | 已完成紧凑三页签界面和 330×450 视觉复核 |
+| 版本 | `0.2.0` 源码与本地发行包已完成验证，等待创建同版本 Tag 和草稿 Release |
+| Windows 构建 | `electron-builder` 生成 NSIS x64 安装版和 Portable x64 免安装版 |
+| 构建加固 | 已启用 Electron fuses、ASAR 完整性校验并限制打包语言和原生文件 |
+| 随包声明 | 打包 `LICENSE.md`、`NOTICE.md`、`PRIVACY.md`、第三方声明和素材台账 |
+| 本地验证 | `npm run verify` 执行自动测试和完整构建；`npm run smoke:packaged` 检查打包程序 |
+| 产物校验 | `scripts/write-checksums.cjs` 要求安装版、blockmap、免安装版和 `latest.yml` 全部存在，再生成 `SHA256SUMS.txt` |
+| 自动发布 | `vX.Y.Z` Tag 触发 Windows 工作流，验证版本、测试、审计、构建并创建草稿 Release |
+| 安装版更新 | 启动后延迟静默检查；设置页支持检查、下载和重启安装，并显示版本、进度和错误状态 |
+| 免安装版更新 | 不原地覆盖，只打开官方 Releases 页面 |
+| 设置兼容 | 已有 schema 迁移、备份和损坏恢复逻辑 |
 
-## 阶段 0：发布身份与许可证
+当前更新界面没有展示更新说明、文件大小或下载速度，也没有取消下载入口。代码具备基本更新状态机，但尚未经过两个真实发布版本的端到端验证。
 
-- 冻结 `appId`、产品名、Publisher、可执行文件名和用户数据目录。
-- 新增 `PRIVACY.md`，说明全局键盘 Hook 只在本机处理输入事件。
-- 新增 `THIRD_PARTY_NOTICES.md`，登记随程序分发的 Electron、Chromium、`uiohook-napi` 和 `node-gyp-build`。
-- 新增 `assets/ASSET_PROVENANCE.md`，记录每个图片、图标和声音的作者、日期、来源与文件哈希。
-- 在安装程序、设置页和发布页提供 `LICENSE.md`、`NOTICE` 与隐私说明入口。
-- README 和发布说明持续明确“官方免费发布，禁止未经授权转卖”。
+## 发布流程
 
-完成标准：发布包内能找到许可证与版权声明，全部素材来源可追溯，发行身份不再随版本变化。
+1. 更新 `package.json` 版本，并把 `CHANGELOG.md` 的“未发布”内容整理为同版本标题和发布日期。
+2. 在干净工作树执行 `npm ci`、`npm run verify`、`npm audit --omit=dev --audit-level=high`、`npm run dist:win` 和 `npm run smoke:packaged`。
+3. 确认以下文件全部存在，且 `SHA256SUMS.txt` 覆盖前四项：
 
-## 阶段 1：构建加固
+```text
+Dagou-Desktop-Pet-Setup-<版本>-x64.exe
+Dagou-Desktop-Pet-Setup-<版本>-x64.exe.blockmap
+Dagou-Desktop-Pet-Portable-<版本>-x64.exe
+latest.yml
+SHA256SUMS.txt
+```
 
-- 配置 Electron fuses，关闭 `RunAsNode`、`NODE_OPTIONS` 和 CLI 调试入口，启用 ASAR 完整性验证。
-- 只打包 `zh-CN`、`en-US` 和 Windows x64 所需的原生文件。
-- 检查安装包、免安装版、更新清单和校验值是否完整。
+4. 提交版本变更，创建与 `package.json` 完全一致的 `vX.Y.Z` Tag 并推送。
+5. 等待 `.github/workflows/release-windows.yml` 完成。工作流只创建草稿 Release，不会直接公开。
+6. 在草稿中补充本版本变化，核对附件和 SHA-256，完成 Windows 人工验收后再发布。
+7. 发布下一版本时，用已安装的上一正式版本完成应用内检查、下载、重启安装和设置保留验证。
 
-完成标准：构建产物缺失或校验失败时流程中止；全新 Windows 10/11 环境可以安装、启动和卸载。
+工作流会拒绝 Tag 与包版本不一致、Changelog 缺少版本标题、测试失败、生产依赖高危审计失败或发布产物缺失的构建。
 
-## 阶段 2：GitHub 发布流程
+## 发布前未完成
 
-- 新增 `.github/workflows/release-windows.yml`。
-- 仅由 `vX.Y.Z` Tag 触发正式发布。
-- 校验 Tag、`package.json` 版本和发布说明一致。
-- 依次执行 `npm ci`、`npm run verify`、打包、冒烟测试和哈希验证。
-- 生成 NSIS、免安装版、`latest.yml`、blockmap 和 `SHA256SUMS.txt`。
-- 同一版本号的文件不得覆盖上传。
-- GitHub Releases 作为免费官方版本的发布源；需要改善国内下载时，可增加只读镜像或 HTTPS CDN。
+以下项目完成前，不应把自动更新描述为已通过生产验证：
 
-完成标准：任一验证失败都不会生成正式 Release，普通分支无法发布版本。
+- [ ] 首次 `vX.Y.Z` Tag 全流程实跑，并确认草稿 Release 的附件、权限和日志正确。
+- [ ] 使用两个真实版本完成 NSIS A 到 B 更新，确认版本、用户设置和窗口状态保留。
+- [ ] 在干净的 Windows 10 和 Windows 11 x64 环境验证安装、自定义目录、启动、退出、覆盖安装和卸载。
+- [ ] 验证离线、超时、GitHub 不可达、磁盘不足、下载损坏和安装失败后的提示与重试。
+- [ ] 配置 Windows 代码签名和可信时间戳，冻结正式 Publisher 身份。
+- [ ] 为启动检查发现的新版本提供托盘提示或设置入口状态，避免用户必须主动打开“关于”页才能获知更新。
+- [ ] 明确是否补充更新说明、文件大小、速度和取消下载；当前 UI 不具备这些能力。
+- [ ] 验证设置文件损坏恢复时用户能够获知恢复结果。
 
-## 阶段 3：应用内更新
+稳定版/测试版通道、分批发布、回滚、匿名统计和崩溃上报不属于当前发布链路，后续引入时需要单独设计隐私、兼容和运维策略。
 
-- 将固定版本的 `electron-updater` 加入生产依赖。
-- 更新逻辑只在主进程运行，Renderer 通过校验 sender 的受限 IPC 操作。
-- 状态至少覆盖：空闲、检查中、已是新版、发现新版、下载中、已下载、已取消和失败。
-- 设置页展示当前版本、新版本、更新说明、文件大小、下载进度和错误信息。
-- 设置“关于”页提供更新操作；启动后延迟进行一次静默检查，无更新时不弹窗。
-- NSIS 版允许确认下载并重启安装；免安装版打开官方 Release 下载页。
-- 只允许访问代码中固定的 GitHub 或 HTTPS 镜像域名。
-- 更新说明按纯文本展示，不直接渲染远端 HTML。
+## 回滚原则
 
-完成标准：使用两个真实版本完成 A 到 B 更新，更新后版本正确且原有设置保留。
-
-## 阶段 4：设置迁移与异常测试
-
-- 为 `settings.json` 增加 schema 版本和逐版本迁移函数。
-- 写入前保留 `.bak`，文件损坏时恢复备份并提示用户。
-- 测试离线、超时、404、下载取消、磁盘不足和文件损坏。
-- 测试默认安装目录、自定义目录、多显示器、系统恢复及 Windows 10/11。
-- 更新安装前停止键盘 Hook、音频和托盘资源。
-- 出现问题时发布更高版本号修复，不覆盖旧版本文件。
-
-## 建议实施文件
-
-| 文件 | 作用 |
-| --- | --- |
-| `.github/workflows/release-windows.yml` | Tag 驱动的 Windows 发布流程 |
-| `src/main/update-service.ts` | 主进程更新状态机 |
-| `src/shared/update-contracts.ts` | 更新状态与 IPC 类型 |
-| `src/preload/index.ts` | 受限更新 API |
-| `src/renderer/settings.*` | 更新与关于界面 |
-| `test/update-service.test.ts` | 更新状态和错误测试 |
-| `scripts/verify-release.ps1` | 哈希和产物检查 |
-| `scripts/e2e-update.ps1` | 双版本更新验收 |
-| `PRIVACY.md` | 隐私说明 |
-| `THIRD_PARTY_NOTICES.md` | 第三方组件声明 |
-| `assets/ASSET_PROVENANCE.md` | 素材来源台账 |
-
-## 正式发布检查表
-
-- [x] README 与发布页明确官方免费发布及禁止未经授权转卖
-- [x] LICENSE、NOTICE、隐私说明和第三方声明随包分发
-- [x] 素材来源台账完成
-- [ ] Tag 发布流程可以重复执行并保留日志
-- [ ] NSIS 双版本更新测试通过
-- [x] 免安装版只引导手动下载
-- [x] 设置迁移、备份和损坏恢复通过
-- [ ] Windows 10/11 安装、启动、退出和卸载通过
-- [ ] 离线、取消、损坏文件和磁盘不足通过
+- 已公开的版本和附件不覆盖、不改写；修复时提高版本号重新发布。
+- 发现严重问题时先将对应 Release 标记为预发布或撤下公开入口，再发布修复版本。
+- Portable 用户始终手动替换文件；NSIS 用户只有在真实双版本验收通过后才主推应用内更新。

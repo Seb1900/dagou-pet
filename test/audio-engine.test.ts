@@ -137,7 +137,7 @@ describe("AudioEngine", () => {
     engine.dispose();
   });
 
-  it("sends note lifecycle, one-shot and live jiao pitch commands", async () => {
+  it("sends note lifecycle and one-shot commands", async () => {
     const { worklet, engine } = await setup();
     const spec = {
       sample: "jiao" as const,
@@ -147,8 +147,7 @@ describe("AudioEngine", () => {
       pan: 0
     };
     engine.noteOn(4, spec);
-    engine.setJiaoSustainPitch(3);
-    engine.noteOff(4, "tail");
+    engine.noteOff(4);
     const ei = {
       sample: "ei" as const,
       role: "normal" as const,
@@ -159,8 +158,7 @@ describe("AudioEngine", () => {
     engine.playOneShot(ei);
     expect(worklet.port.messages.slice(1)).toEqual([
       { type: "note-on", pressId: 4, spec },
-      { type: "jiao-pitch", semitones: 3 },
-      { type: "note-off", pressId: 4, release: "tail" },
+      { type: "note-off", pressId: 4 },
       {
         type: "one-shot",
         pressId: -1,
@@ -181,13 +179,12 @@ describe("AudioEngine", () => {
     };
     const gou = { ...da, sample: "gou" as const };
     engine.noteOn(8, da);
-    engine.noteOff(8, "tail", gou);
+    engine.noteOff(8, gou);
     expect(worklet.port.messages.slice(1)).toEqual([
       { type: "note-on", pressId: 8, spec: da },
       {
         type: "note-off",
         pressId: 8,
-        release: "tail",
         followUp: { pressId: -1, spec: gou }
       }
     ]);
@@ -240,9 +237,8 @@ describe("AudioEngine", () => {
 
     engine.scheduleVoices("held-step", [spec], startTime, true);
     engine.releaseGroup("held-step");
-    engine.releaseGroup("forced-step", "fade");
 
-    expect(worklet.port.messages.slice(-3)).toEqual([
+    expect(worklet.port.messages.slice(-2)).toEqual([
       {
         type: "schedule-voices",
         groupId: "held-step",
@@ -250,15 +246,18 @@ describe("AudioEngine", () => {
         held: true,
         voices: [{ pressId: -1, spec }]
       },
-      { type: "release-group", groupId: "held-step", release: "tail" },
-      { type: "release-group", groupId: "forced-step", release: "fade" }
+      { type: "release-group", groupId: "held-step" }
     ]);
     engine.dispose();
   });
 
-  it("mutes through the master gain and stops all voices on disposal", async () => {
+  it("applies volume and stops all voices on disposal", async () => {
     const { context, worklet, engine } = await setup();
-    engine.setMuted(true);
+    engine.setVolume(0.8);
+    expect(context.gains[0].gain.value).toBe(0.8);
+    engine.setVolume(2);
+    expect(context.gains[0].gain.value).toBe(1.6);
+    engine.setVolume(-1);
     expect(context.gains[0].gain.value).toBe(0);
     engine.dispose();
     expect(worklet.port.messages.at(-1)).toEqual({ type: "stop-all" });

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SettingsStore } from "../src/main/settings-store";
+import { DEFAULT_SETTINGS } from "../src/shared/settings";
 
 const directories: string[] = [];
 
@@ -43,7 +44,6 @@ describe("SettingsStore", () => {
     const store = new SettingsStore(directory);
     expect(store.get().volume).toBe(0.35);
     expect(store.get().scale).toBe(1.7);
-    expect(store.getNotice()).toContain("升级");
     const stored = JSON.parse(readFileSync(join(directory, "settings.json"), "utf8"));
     expect(stored.schemaVersion).toBe(1);
   });
@@ -59,6 +59,31 @@ describe("SettingsStore", () => {
 
     const store = new SettingsStore(directory);
     expect(store.get().volume).toBe(0.25);
-    expect(store.getNotice()).toContain("备份恢复");
+  });
+
+  it("restores defaults while preserving the supplied pet position", () => {
+    const directory = temporaryDirectory();
+    const store = new SettingsStore(directory);
+    store.update({
+      volume: 1.5,
+      scale: 3,
+      playbackMode: "instant",
+      jiaoKeyCodes: [1, 2]
+    });
+
+    const restored = store.reset({ x: -420, y: 180 });
+
+    expect(restored).toEqual({
+      ...DEFAULT_SETTINGS,
+      x: -420,
+      y: 180,
+      jiaoKeyCodes: [...DEFAULT_SETTINGS.jiaoKeyCodes]
+    });
+    (restored.jiaoKeyCodes as number[]).push(999);
+    expect(store.get().jiaoKeyCodes).toEqual(DEFAULT_SETTINGS.jiaoKeyCodes);
+    const stored = JSON.parse(
+      readFileSync(join(directory, "settings.json"), "utf8")
+    );
+    expect(stored.settings).toEqual(store.get());
   });
 });

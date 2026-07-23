@@ -148,6 +148,23 @@ export function positionFromDragPointer({
   };
 }
 
+export function positionWindowAboveRectangle(
+  anchor: WindowRectangle,
+  windowSize: Pick<WindowRectangle, "width" | "height">,
+  workArea: WindowRectangle
+): WindowPosition {
+  const requested = {
+    x: anchor.x + anchor.width / 2 - windowSize.width / 2,
+    y: anchor.y - windowSize.height
+  };
+  return constrainWindowPositionToWorkArea(
+    requested,
+    { x: 0, y: 0, width: windowSize.width, height: windowSize.height },
+    workArea,
+    1
+  );
+}
+
 export function scaleFromResizePointer({
   startSize,
   deltaX,
