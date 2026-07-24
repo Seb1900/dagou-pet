@@ -1,4 +1,5 @@
 use crate::audio::SoundController;
+use crate::cursor::DragCursors;
 use crate::input::{DogKeyRole, resolve_key_expression};
 use crate::render::{LayeredRenderer, PetAnimator};
 use crate::settings::{
@@ -53,8 +54,8 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CS_HREDRAW, CS_VREDRAW, CallNextHookEx, CreatePopupMenu, CreateWindowExW,
     DefWindowProcW, DestroyIcon, DestroyMenu, DestroyWindow, DispatchMessageW, FindWindowW,
-    GWLP_USERDATA, GetClientRect, GetCursorPos, GetMessageW, GetWindowRect, HHOOK, HICON, HMENU,
-    HTCLIENT, HTTRANSPARENT, HWND_NOTOPMOST, HWND_TOPMOST, IDC_ARROW, IDC_HAND, IDC_SIZENESW,
+    GWLP_USERDATA, GetClientRect, GetCursorPos, GetMessageW, GetWindowRect, HCURSOR, HHOOK, HICON,
+    HMENU, HTCLIENT, HTTRANSPARENT, HWND_NOTOPMOST, HWND_TOPMOST, IDC_ARROW, IDC_SIZENESW,
     IDC_SIZENWSE, IDYES, IsWindowVisible, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, LoadCursorW,
     MB_ICONERROR, MB_ICONINFORMATION, MB_ICONQUESTION, MB_OK, MB_YESNO, MF_CHECKED, MF_SEPARATOR,
     MF_STRING, MSG, MessageBoxW, PBT_APMRESUMEAUTOMATIC, PBT_APMSUSPEND, PostMessageW,
@@ -118,6 +119,7 @@ struct AppState {
     settings_window: HWND,
     icon_large: HICON,
     icon_small: HICON,
+    drag_cursors: DragCursors,
     keyboard_hook: Option<HHOOK>,
     mutex: windows::Win32::Foundation::HANDLE,
     tray_added: bool,
@@ -909,6 +911,7 @@ pub fn run() -> Result<()> {
         }
         let icon_large = load_icon(256)?;
         let icon_small = load_icon(32)?;
+        let drag_cursors = DragCursors::load(instance)?;
         register_window_classes(instance, icon_large, icon_small)?;
 
         let settings_store = SettingsStore::load_default_location()?;
@@ -935,6 +938,7 @@ pub fn run() -> Result<()> {
             settings_window: HWND::default(),
             icon_large,
             icon_small,
+            drag_cursors,
             keyboard_hook: None,
             mutex,
             tray_added: false,
@@ -1098,18 +1102,22 @@ unsafe extern "system" fn pet_window_proc(
     };
     match message {
         WM_SETCURSOR => {
-            let cursor_id = match state.drag {
-                Some(DragGesture::Move { .. }) => Some(IDC_HAND),
-                Some(DragGesture::Resize { .. }) => Some(state.resize_cursor()),
+            let cursor: Option<HCURSOR> = match state.drag {
+                Some(DragGesture::Move { .. }) => Some(state.drag_cursors.grabbing()),
+                Some(DragGesture::Resize { .. }) => unsafe {
+                    LoadCursorW(None, state.resize_cursor()).ok()
+                },
                 None => {
-                    let mut cursor = POINT::default();
+                    let mut point = POINT::default();
                     let mut rect = RECT::default();
-                    if unsafe { GetCursorPos(&mut cursor).is_ok() }
+                    if unsafe { GetCursorPos(&mut point).is_ok() }
                         && unsafe { GetWindowRect(hwnd, &mut rect).is_ok() }
                     {
-                        match state.hit_region(cursor.x - rect.left, cursor.y - rect.top) {
-                            HitRegion::Dog => Some(IDC_HAND),
-                            HitRegion::Scale => Some(state.resize_cursor()),
+                        match state.hit_region(point.x - rect.left, point.y - rect.top) {
+                            HitRegion::Dog => Some(state.drag_cursors.grab()),
+                            HitRegion::Scale => unsafe {
+                                LoadCursorW(None, state.resize_cursor()).ok()
+                            },
                             HitRegion::Outside => None,
                         }
                     } else {
@@ -1117,9 +1125,7 @@ unsafe extern "system" fn pet_window_proc(
                     }
                 }
             };
-            if let Some(cursor_id) = cursor_id
-                && let Ok(cursor) = unsafe { LoadCursorW(None, cursor_id) }
-            {
+            if let Some(cursor) = cursor {
                 unsafe { SetCursor(Some(cursor)) };
                 return LRESULT(1);
             }

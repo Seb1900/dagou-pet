@@ -2,6 +2,7 @@
 
 mod app;
 mod audio;
+mod cursor;
 mod input;
 mod render;
 mod settings;

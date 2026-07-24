@@ -15,5 +15,6 @@
 | sha2 及 RustCrypto 依赖 | SHA-256 校验 | MIT、Apache-2.0 |
 | MinGW-w64 | Windows GNU 目标链接支持 | ZPL-2.1 及上游许可 |
 | NSIS | Windows 安装与卸载程序 | Zlib |
+| Chromium `hand_grab.cur`、`hand_grabbing.cur` | 桌宠抓取与拖动光标 | MPL-1.1 / GPL-2.0-or-later / LGPL-2.1-or-later 三选一，本项目按 MPL-1.1 使用 |
 
 准确版本记录在 `Cargo.lock`。项目自身许可见 [LICENSE.md](LICENSE.md)，素材归属见 [assets/ASSET_PROVENANCE.md](assets/ASSET_PROVENANCE.md)。

@@ -6,6 +6,8 @@ fn main() {
     println!("cargo:rerun-if-env-changed=PATH");
     println!("cargo:rerun-if-env-changed=CARGO_PKG_VERSION");
     println!("cargo:rerun-if-changed=assets/branding/app-icon.ico");
+    println!("cargo:rerun-if-changed=assets/cursors/hand_grab.cur");
+    println!("cargo:rerun-if-changed=assets/cursors/hand_grabbing.cur");
 
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
@@ -39,6 +41,13 @@ fn main() {
     }
     fs::copy("assets/branding/app-icon.ico", output.join("app-icon.ico"))
         .expect("failed to stage app icon");
+    fs::copy("assets/cursors/hand_grab.cur", output.join("hand_grab.cur"))
+        .expect("failed to stage grab cursor");
+    fs::copy(
+        "assets/cursors/hand_grabbing.cur",
+        output.join("hand_grabbing.cur"),
+    )
+    .expect("failed to stage grabbing cursor");
     fs::write(
         output.join("app.manifest"),
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -66,6 +75,8 @@ fn main() {
         format!(
             r#"
 1 ICON "app-icon.ico"
+101 CURSOR "hand_grab.cur"
+102 CURSOR "hand_grabbing.cur"
 2 24 "app.manifest"
 
 1 VERSIONINFO
